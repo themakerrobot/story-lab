@@ -10,9 +10,9 @@
   'use strict';
   var fmt = SL.fmt, J = SL.J;
 
-  /* ---------- 주인공 (kids-lab HEROES 12종) ---------- */
+  /* ---------- 주인공 (kids-lab HEROES 12종 + 사람: 아이·어른·노인 6명) ---------- */
   var HEROES = [['rabbit', '🐰', '토끼'], ['bear', '🐻', '곰'], ['fox', '🦊', '여우'], ['frog', '🐸', '개구리'], ['robot', '🤖', '로봇'],
-    ['girl', '👧', '소녀'], ['boy', '👦', '소년'], ['unicorn', '🦄', '유니콘'], ['dragon', '🐉', '아기 용'], ['penguin', '🐧', '펭귄'],
+    ['girl', '👧', '소녀'], ['boy', '👦', '소년'], ['woman', '👩', '아주머니'], ['man', '👨', '아저씨'], ['grandma', '👵', '할머니'], ['grandpa', '👴', '할아버지'], ['unicorn', '🦄', '유니콘'], ['dragon', '🐉', '아기 용'], ['penguin', '🐧', '펭귄'],
     ['cat', '🐱', '고양이'], ['dino', '🦖', '공룡']].map(function (a) { return { id: a[0], e: a[1], n: a[2] }; });
 
   /* ---------- 성격: 처음 소개와 끝의 "성장" 문장이 달라진다 ---------- */
@@ -552,7 +552,7 @@
   }
 
   /* 화면에 보여 줄 카드 고르기: 너무 많으면 줄인다. 해결은 물건·친구 재주 카드를 1장씩 꼭 넣는다 */
-  var SHOW = { hero: 12, trait: 5, goal: 6, item: 12, time: 4, place: 9, move: 9, meet: 6, vil: 6, ev: 4, vev: 4, feel: 6, sol: 4, who: 6, outcome: 3, ending: 4 };
+  var SHOW = { hero: 16, trait: 5, goal: 6, item: 12, time: 4, place: 9, move: 9, meet: 6, vil: 6, ev: 4, vev: 4, feel: 6, sol: 4, who: 6, outcome: 3, ending: 4 };
   function showOptions(step, st, r) {
     var all = allOptions(step, st), max = SHOW[step.kind] || 6;
     r = r || Math.random;

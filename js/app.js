@@ -106,8 +106,13 @@
         h('div', { class: 'eyebrow', text: '작업대' }),
         h('h2', { text: '오늘은 어떤 그림책을 만들까요?' }),
         btn('✏️ 새 그림책 만들기', 'primary big block', worlds, { 'data-act': 'new' }),
-        h('ol', { class: 'steps4' }, [['📦', '이야기 상자 고르기'], ['📐', '설계도 정하기'], ['🃏', '이야기 카드 고르기'], ['📕', '제본하고 읽어 주기']].map(function (x) {
-          return h('li', {}, [h('b', { text: x[0] }), x[1]]);
+        h('div', { class: 'steps-t', text: '만드는 순서' }),
+        h('ol', { class: 'steps4' }, [['📦', '이야기 상자 고르기', worlds], ['📐', '설계도 정하기', worlds], ['🃏', '이야기 카드 고르기', worlds],
+          ['📕', '제본하고 읽어 주기', function () { if (data.books.length) read(data.books[0], 0); else worlds(); }]].map(function (x, i) {
+          return h('li', {}, [h('button', { type: 'button', class: 'step', 'data-step-go': String(i + 1), onclick: x[2], 'aria-label': (i + 1) + '단계 ' + x[1] + (i === 3 && data.books.length ? ' (최근 책 열기)' : '') }, [
+            h('span', { class: 'num', text: String(i + 1) }), h('b', { text: x[0], 'aria-hidden': 'true' }),
+            h('span', { class: 'sl' }, [x[1], i === 3 && data.books.length ? h('small', { text: '최근 책 열기' }) : null]), h('span', { class: 'go', text: '›', 'aria-hidden': 'true' })
+          ])]);
         }))
       ])
     ]);
@@ -526,7 +531,7 @@
   /* ---------- 꾸미기: 배경 · 그림(인물 이모지·스티커) · 목소리 ---------- */
   var BG_NAMES = { meadow: '들판', night: '밤 마을', forest: '숲', beach: '바닷가', island: '무인도', space: '우주', moon: '달', mars: '화성', starland: '별나라', candy: '사탕 행성', ice: '얼음 행성', rainbow: '무지개', sea: '바닷속', castle: '성', room: '방', party: '파티', school: '마법 교실', mountain: '산', volcano: '화산', jungle: '정글', field: '운동장', circus: '서커스' };
   var PALETTE = [['동물', '🐰 🐻 🦊 🐸 🐱 🐶 🐼 🐨 🐯 🦁 🐵 🐧 🐥 🦄 🐉 🦖 🦕 🐢 🐙 🐬 🐳 🦋 🐝 🐞 🦉 🐿️ 🐘 🦒'],
-    ['사람·요정', '👧 👦 👶 👵 👴 🧒 🧚 🧜‍♀️ 🧙 🤖 👽 👻 🦸 🧑‍🚀 👸 🤴'],
+    ['사람·요정', '👧 👦 👩 👨 👶 👵 👴 🧒 🧚 🧜‍♀️ 🧙 🤖 👽 👻 🦸 🧑‍🚀 👸 🤴'],
     ['자연', '🌸 🌻 🌷 🌈 ⭐ 🌙 ☀️ ☁️ ❄️ 🔥 🌊 🍄 🌳 🍀 🌵 🪨'],
     ['물건', '🎈 🎁 🎂 🍪 🍎 🍓 🧸 ⚽ 🎸 🔦 🗺️ 🪄 👑 💎 🚀 ⛵ 🚗 🏠 📚 ✏️ 🎨 💌']];
   function decorEditor(book, page, onSave) {

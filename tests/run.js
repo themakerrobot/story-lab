@@ -229,6 +229,34 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     track(page); await ctx.close();
   });
 
+  await test('책장 작업대: 만드는 순서 단계를 누르면 이동, 주인공 16종(사람 6명)', async () => {
+    const { ctx, page } = await newPage({ viewport: { width: 1280, height: 800 } });
+    await page.goto(BASE);
+    const steps = await page.$$('[data-step-go]');
+    assert(steps.length === 4, '단계 버튼 수 ' + steps.length);
+    for (const st of steps) { const b = await st.boundingBox(); assert(b.height >= 48, '단계 버튼이 48px 미만'); }
+    await page.click('[data-step-go="1"]');
+    assert(await page.$('[data-screen=worlds]'), '1단계를 눌러도 이야기 상자로 가지 않음');
+    await page.click('[data-act=back]');
+    await page.click('[data-step-go="4"]');
+    assert(await page.$('[data-screen=worlds]'), '책이 없을 때 4단계가 새 책으로 가지 않음');
+    await page.click('[data-world="adv"]'); await page.click('[data-preset="baby"]');
+    const heroes = await page.$$eval('[data-step=hero] .card .cn', (a) => a.map((x) => x.textContent));
+    assert(heroes.length === 16, '주인공 수 ' + heroes.length);
+    ['소녀', '소년', '아주머니', '아저씨', '할머니', '할아버지'].forEach((n) => assert(heroes.indexOf(n) >= 0, n + ' 없음'));
+    await page.click('[data-step=hero] .card >> text=할머니');
+    await page.click('[data-act=name-skip]');
+    for (let n = 0; n < 20 && await page.$('[data-screen=pick]'); n++) await page.click('[data-act=random]');
+    await page.click('[data-act=complete]');
+    await page.waitForSelector('[data-screen=read]');
+    const first = await page.evaluate(() => JSON.parse(localStorage.getItem('storylab-v1')).books[0].pages[0].t);
+    assert(first.indexOf('할머니가 살았어요') >= 0, '할머니 소개 문장: ' + first);
+    await page.click('[data-act=close]');
+    await page.click('[data-step-go="4"]');
+    assert(await page.$('[data-screen=read]'), '4단계가 최근 책을 열지 않음');
+    track(page); await ctx.close();
+  });
+
   await test('설계도: 내 맘대로 (인물·장소·사건·말썽꾼) 단계 수가 맞음', async () => {
     const { ctx, page } = await newPage();
     await page.goto(BASE);
