@@ -15,10 +15,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # 배포본: 테스트·문서·개발 파일만 빼고 전부 (목록을 나열하면 새 폴더가 빠지는 일이 생긴다)
+      - name: Build site
+        run: |
+          mkdir _site
+          git archive HEAD -- . ':!tests' ':!.github' ':!README.md' ':!.gitignore' | tar -x -C _site
+          ls _site
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -26,24 +32,20 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.63.0
           npx playwright install --with-deps chromium
-      - name: Test
-        run: node tests/run.js
+      # 배포할 파일 그대로 띄워서 확인한다 (빠진 파일이 있으면 오프라인·콘솔 오류 테스트에서 걸린다)
+      - name: Test (built site)
+        run: STORYLAB_ROOT=_site node tests/run.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
 
   deploy:
-    needs: test
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Build site (app files only)
-        run: |
-          mkdir _site
-          cp -r index.html manifest.webmanifest sw.js css js icons licenses vendor _site/
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

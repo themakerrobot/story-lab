@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
 
-const ROOT = path.join(__dirname, '..');
+const ROOT = process.env.STORYLAB_ROOT ? path.resolve(process.env.STORYLAB_ROOT) : path.join(__dirname, '..'); /* CI 는 배포본(_site)을 띄워 확인한다 */
 const PORT = 8000 + Math.floor(Math.random() * 900);
 const BASE = `http://127.0.0.1:${PORT}/`;
 const results = [];
@@ -563,7 +563,8 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
   await test('오프라인: 서비스 워커 설치 후 네트워크를 끊어도 다시 열림', async () => {
     const { ctx, page } = await newPage({ sw: true });
     await page.goto(BASE);
-    await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+    /* 빠진 파일이 있으면 서비스 워커 설치가 실패해 ready 가 오지 않는다 → 15초 안에 안 오면 실패 */
+    await page.evaluate(() => Promise.race([navigator.serviceWorker.ready, new Promise((_, no) => setTimeout(() => no(new Error('서비스 워커 설치 실패 (SHELL 파일이 빠졌을 수 있음)')), 15000))]));
     await page.reload();
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
     await makeBook(page, { preset: 'baby' });
