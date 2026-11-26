@@ -177,24 +177,36 @@
     bg.innerHTML = bgSVG(sc.bg); /* 미리 정해 둔 그림만 넣는다(아이 입력 없음) */
     root.appendChild(bg);
     root.appendChild(Object.assign(document.createElement('div'), { className: 'tint' }));
-    var cast = sc.cast || [];
+    var cast = sc.cast || [], pos = sc.pos || {};
+    /* 꾸미기에서 옮긴 위치: 그림 가운데가 (x%, y%) */
+    function put(el, key) {
+      el.dataset.k = key;
+      var p = pos[key];
+      if (Array.isArray(p) && isFinite(p[0]) && isFinite(p[1])) {
+        el.style.left = Math.max(0, Math.min(100, p[0])) + '%';
+        el.style.top = Math.max(0, Math.min(100, p[1])) + '%';
+        el.style.right = 'auto'; el.style.bottom = 'auto';
+        el.classList.add('moved');
+      }
+      return el;
+    }
     if (opts.cover) {
       root.appendChild(span('ch hero big', cast[0] || '🙂'));
       cast.slice(1, 4).forEach(function (e, i) { root.appendChild(span('ch mini', e, 'right:' + (6 + i * 15) + '%')); });
     } else {
       var n = cast.length, size = n <= 2 ? 32 : n === 3 ? 28 : n === 4 ? 25 : 22;
-      root.appendChild(span('ch hero', cast[0] || '🙂', 'font-size:' + size + 'cqh;left:14%'));
+      root.appendChild(put(span('ch hero', cast[0] || '🙂', 'font-size:' + size + 'cqh;left:14%'), 'c0'));
       var others = cast.slice(1);
       others.forEach(function (e, i) {
         /* 오른쪽 끝부터 왼쪽으로 차례로 */
         var right = 86 - i * (n <= 3 ? 22 : 17);
-        root.appendChild(span('ch friend', e, 'font-size:' + size + 'cqh;left:' + right + '%;animation-delay:' + (i * 0.3) + 's'));
+        root.appendChild(put(span('ch friend', e, 'font-size:' + size + 'cqh;left:' + right + '%;animation-delay:' + (i * 0.3) + 's'), 'c' + (i + 1)));
       });
-      if (sc.guest) root.appendChild(span('ch guest', sc.guest, 'font-size:' + Math.round(size * 0.8) + 'cqh'));
-      if (sc.vil) root.appendChild(span('ch vil', sc.vil));
+      if (sc.guest) root.appendChild(put(span('ch guest', sc.guest, 'font-size:' + Math.round(size * 0.8) + 'cqh'), 'g'));
+      if (sc.vil) root.appendChild(put(span('ch vil', sc.vil), 'v'));
       (sc.obj || []).slice(0, 2).forEach(function (e, i, arr) {
         var left = arr.length === 1 ? 50 : (i === 0 ? 40 : 60);
-        root.appendChild(span('ob', e, 'left:' + left + '%;animation-delay:' + (i * 0.6) + 's'));
+        root.appendChild(put(span('ob', e, 'left:' + left + '%;animation-delay:' + (i * 0.6) + 's'), 'o' + i));
       });
     }
     if (sc.mood === 'happy') {
@@ -217,7 +229,7 @@
     var sw = function (e) { return e && swap[e] ? swap[e] : e; };
     return pages.map(function (p, k) {
       var sc = p.sc || {}, d = deco[k] || {};
-      var nsc = { bg: d.bg && BG[d.bg] ? d.bg : sc.bg, tm: d.tm || sc.tm, cast: (sc.cast || []).map(sw), vil: sw(sc.vil), obj: Array.isArray(d.obj) ? d.obj.slice(0, 2) : (sc.obj || []), mood: sc.mood, guest: sc.guest };
+      var nsc = { bg: d.bg && BG[d.bg] ? d.bg : sc.bg, tm: d.tm || sc.tm, cast: (sc.cast || []).map(sw), vil: sw(sc.vil), obj: Array.isArray(d.obj) ? d.obj.slice(0, 2) : (sc.obj || []), mood: sc.mood, guest: sc.guest, pos: d.pos && typeof d.pos === 'object' ? d.pos : null };
       return { t: p.t, part: p.part, spk: p.spk || [], sc: nsc };
     });
   }

@@ -402,3 +402,11 @@ input { font: inherit; }
 .role .who .btn { margin-left: auto; min-height: 48px; font-size: 16px; padding: 8px 14px; }
 .deco-foot { position: sticky; bottom: -24px; background: var(--db-card); margin: 18px -24px -24px; padding: 14px 24px 18px; border-top: 1px solid var(--line); z-index: 2; }
 @media (max-width: 760px) { .deco-foot { bottom: -16px; margin: 14px -16px -16px; padding: 12px 16px 14px; } .deco-foot .btn { flex: 1 1 auto; } }
+
+/* 꾸미기: 끌어서 옮기기 */
+.scene .moved, .scene .ch.vil.moved { translate: -50% -50%; }
+.scene.editable { touch-action: none; }
+.scene.editable .ch, .scene.editable .ob { pointer-events: auto; cursor: grab; animation: none; }
+@media (hover: hover) { .scene.editable .ch:hover, .scene.editable .ob:hover { outline: 3px dashed rgba(255, 255, 255, .9); outline-offset: 2px; border-radius: 12px; } }
+.scene.editable .dragging { outline: 3px dashed rgba(255, 255, 255, .95); outline-offset: 2px; border-radius: 12px; }
+.scene.editable .dragging { cursor: grabbing; filter: drop-shadow(0 1.6cqh 0 rgba(0, 0, 0, .25)); z-index: 5; }

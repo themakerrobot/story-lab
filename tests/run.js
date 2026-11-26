@@ -365,6 +365,47 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     track(page); await ctx.close();
   });
 
+  await test('꾸미기: 인물·스티커를 끌어서 옮기기 (그 쪽만, 새로 고침 뒤 유지, 처음대로)', async () => {
+    const { ctx, page } = await newPage();
+    await page.goto(BASE);
+    await makeBook(page, { preset: 'baby', world: 'adv' });
+    if ((await page.textContent('[data-act=play]')).indexOf('멈추기') >= 0) await page.click('[data-act=play]');
+    for (let n = 0; n < 40 && (await page.textContent('[data-pno]')) !== '표지'; n++) await page.keyboard.press('ArrowLeft');
+    await page.click('[data-act=next]'); await page.click('[data-act=next]');
+    await page.click('[data-act=decorate]'); await page.click('[data-tab=art]');
+    const sc = page.locator('[data-editable]');
+    const box = await sc.boundingBox();
+    const hero = sc.locator('[data-k=c0]');
+    const hb = await hero.boundingBox();
+    /* 주인공을 장면 오른쪽 위(70%, 30%)로 끈다 */
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.3, { steps: 8 });
+    await page.mouse.up();
+    assert(await page.$('.btn.emo.on[data-char]'), '끈 인물이 골라지지 않음');
+    await page.click('[data-act=deco-save]');
+    const center = async () => page.evaluate(() => {
+      const s = document.querySelector('.pg .scene').getBoundingClientRect(), h = document.querySelector('.pg .scene [data-k=c0]').getBoundingClientRect();
+      return [((h.left + h.width / 2) - s.left) / s.width * 100, ((h.top + h.height / 2) - s.top) / s.height * 100];
+    });
+    let c = await center();
+    assert(Math.abs(c[0] - 70) < 6 && Math.abs(c[1] - 30) < 8, '옮긴 위치가 다름 ' + c.map(Math.round));
+    await page.click('[data-act=next]');
+    c = await center();
+    assert(c[0] < 40, '다른 쪽까지 옮겨짐 ' + c.map(Math.round));
+    await page.reload();
+    await page.waitForSelector('[data-book]');
+    await page.click('[data-book] .open');
+    await page.click('[data-act=next]'); await page.click('[data-act=next]');
+    c = await center();
+    assert(Math.abs(c[0] - 70) < 6 && Math.abs(c[1] - 30) < 8, '새로 고친 뒤 위치가 안 남음 ' + c.map(Math.round));
+    await page.click('[data-act=decorate]'); await page.click('[data-tab=art]');
+    await page.click('[data-act=deco-reset]'); await page.click('[data-act=deco-save]');
+    c = await center();
+    assert(c[0] < 40, '처음대로가 안 됨 ' + c.map(Math.round));
+    track(page); await ctx.close();
+  });
+
   await test('목소리: 해설과 대사를 나눠 읽고, 인물마다 정한 목소리(높낮이)로 읽음', async () => {
     const { ctx, page } = await newPage();
     await page.goto(BASE);

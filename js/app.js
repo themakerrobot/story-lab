@@ -539,7 +539,45 @@
     var box;
     function cur() {
       var sw = function (e) { return e && swap[e] ? swap[e] : e; };
-      return { bg: deco.bg || raw.bg, tm: deco.tm || raw.tm, cast: (raw.cast || []).map(sw), vil: sw(raw.vil), obj: Array.isArray(deco.obj) ? deco.obj : (raw.obj || []), mood: raw.mood, guest: raw.guest };
+      return { bg: deco.bg || raw.bg, tm: deco.tm || raw.tm, cast: (raw.cast || []).map(sw), vil: sw(raw.vil), obj: Array.isArray(deco.obj) ? deco.obj : (raw.obj || []), mood: raw.mood, guest: raw.guest, pos: deco.pos || null };
+    }
+    /* 미리보기 장면에서 인물·스티커를 끌어 옮긴다. 누르기만 하면 그 그림을 고른다 */
+    function movable(scene) {
+      scene.classList.add('editable');
+      scene.setAttribute('data-editable', '');
+      scene.addEventListener('pointerdown', function (e) {
+        var el = e.target.closest ? e.target.closest('[data-k]') : null;
+        if (!el || !scene.contains(el)) return;
+        e.preventDefault();
+        var key = el.dataset.k, rect = scene.getBoundingClientRect(), moved = false, sx = e.clientX, sy = e.clientY;
+        var r0 = el.getBoundingClientRect();
+        var ox = (r0.left + r0.width / 2) - e.clientX, oy = (r0.top + r0.height / 2) - e.clientY;
+        try { scene.setPointerCapture(e.pointerId); } catch (er) { }
+        el.classList.add('dragging');
+        function at(ev) {
+          var x = (ev.clientX + ox - rect.left) / rect.width * 100, y = (ev.clientY + oy - rect.top) / rect.height * 100;
+          return [Math.round(Math.max(4, Math.min(96, x)) * 10) / 10, Math.round(Math.max(4, Math.min(96, y)) * 10) / 10];
+        }
+        function move(ev) {
+          if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 4) moved = true;
+          if (!moved) return;
+          var p = at(ev);
+          el.style.left = p[0] + '%'; el.style.top = p[1] + '%'; el.style.right = 'auto'; el.style.bottom = 'auto';
+          el.classList.add('moved');
+        }
+        function up(ev) {
+          scene.removeEventListener('pointermove', move); scene.removeEventListener('pointerup', up); scene.removeEventListener('pointercancel', up);
+          el.classList.remove('dragging');
+          if (moved) { deco.pos = deco.pos || {}; deco.pos[key] = at(ev); }
+          var all = chars();
+          if (key[0] === 'c' && all[+key.slice(1)]) sel = { type: 'char', orig: all[+key.slice(1)] };
+          else if (key === 'v' && raw.vil) sel = { type: 'char', orig: raw.vil };
+          else if (key[0] === 'o') sel = { type: 'obj', i: +key.slice(1) };
+          draw();
+        }
+        scene.addEventListener('pointermove', move); scene.addEventListener('pointerup', up); scene.addEventListener('pointercancel', up);
+      });
+      return scene;
     }
     function chars() { var a = (raw.cast || []).slice(); if (raw.vil) a.push(raw.vil); return a; }
     function apply(e) {
@@ -548,6 +586,7 @@
       else {
         var o = cur().obj.slice();
         if (sel.type === 'obj') o[sel.i] = e; else if (o.length < 2) { o.push(e); sel = { type: 'obj', i: o.length - 1 }; }
+        if (deco.pos && sel.type === 'obj' && o.length === 1 && deco.pos.o1) delete deco.pos.o1;
         deco.obj = o;
       }
       draw();
@@ -587,7 +626,11 @@
           var on = sel && sel.type === 'obj' && sel.i === i;
           return h('span', { class: 'stk' }, [
             btn(e, 'emo' + (on ? ' on' : ''), function () { sel = { type: 'obj', i: i }; draw(); }, { 'data-obj': String(i), 'aria-label': '스티커 바꾸기' }),
-            btn('✕', 'icon x', function () { var o = c2.obj.slice(); o.splice(i, 1); deco.obj = o; sel = null; draw(); }, { 'aria-label': '스티커 떼기', 'data-del-obj': String(i) })
+            btn('✕', 'icon x', function () {
+              var o = c2.obj.slice(); o.splice(i, 1); deco.obj = o; sel = null;
+              if (deco.pos) { if (i === 0 && deco.pos.o1) deco.pos.o0 = deco.pos.o1; else if (i === 0) delete deco.pos.o0; delete deco.pos.o1; }
+              draw();
+            }, { 'aria-label': '스티커 떼기', 'data-del-obj': String(i) })
           ]);
         }).concat(c2.obj.length < 2 ? [btn('＋ 스티커', 'add' + (sel && sel.type === 'add' ? ' on' : ''), function () { sel = { type: 'add' }; draw(); }, { 'data-act': 'add-sticker' })] : []));
         var pal = h('div', { class: 'palette' + (sel ? '' : ' dim') });
@@ -596,7 +639,7 @@
           pal.appendChild(h('div', { class: 'pal-row' }, g[1].split(' ').map(function (e) { return btn(e, 'emo', function () { apply(e); }, { 'data-emo': e, disabled: !sel }); })));
         });
         box.appendChild(h('div', { class: 'deco-body' }, [
-          h('div', { class: 'deco-prev' }, [SL.renderScene(c2)]),
+          h('div', { class: 'deco-prev' }, [movable(SL.renderScene(c2)), h('div', { class: 'hint', text: '👆 그림을 끌어서 옮겨요. 누르면 바꿀 그림으로 골라져요.' })]),
           h('div', { class: 'deco-side' }, [
             h('div', { class: 'deco-lab', text: '인물 — 눌러서 고른 뒤 아래에서 바꿀 그림을 골라요 (책 전체)' }), who,
             h('div', { class: 'deco-lab', text: '스티커 — 이 쪽에만 붙어요 (2개까지)' }), stickers,
