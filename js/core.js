@@ -218,7 +218,7 @@
   /* 한 문장을 기기 목소리로 읽는다. 끝나면 done()을 꼭 한 번만 부른다.
      onend가 오지 않는 기기 대비: 예상 시간이 지나면 speaking을 보고, 아직 말하는 중이면 최대 3배까지 기다린다 */
   var lastUtter = null;
-  function deviceSay(text, rate, done) {
+  function deviceSay(text, rate, done, pitch) {
     var s = synth();
     var finished = false, timers = [];
     var t0 = Date.now(), expect = expectMs(text, rate);
@@ -242,6 +242,7 @@
       u = new global.SpeechSynthesisUtterance(String(text));
       u.lang = 'ko-KR';
       u.rate = rate || 1;
+      u.pitch = pitch || 1;
       var v = pickVoice();
       if (v) u.voice = v;
       u.onend = function () { finish(true); };
@@ -328,7 +329,7 @@
       if (finished) return;
       if (e && e.name === 'AbortError') return;
       console.warn('[읽기] AI 목소리 합성 실패, 기기 목소리로 읽어요', e);
-      var h = deviceSay(text, opts.rate, finish);
+      var h = deviceSay(text, opts.rate, finish, opts.pitch);
       cancelInner = h.cancel;
     });
     var cancelInner = null;
@@ -367,8 +368,26 @@
       if (done) done(ok);
     };
     if (!spoken) { var t = setTimeout(function () { cb(true); }, ms(300)); current = { cancel: function () { clearTimeout(t); } }; return; }
-    current = (opts.voice === 'ai' && model.state === 'ready') ? modelSay(spoken, opts, cb) : deviceSay(spoken, opts.rate, cb);
+    current = (opts.voice === 'ai' && model.state === 'ready') ? modelSay(spoken, opts, cb) : deviceSay(spoken, opts.rate, cb, opts.pitch);
   }
   SL.say = say;
+
+  /* ---------- 해설과 대사 나누기 ----------
+     문장 하나를 따옴표 밖(해설)과 안(대사)으로 나눈다. who: 대사 임자 목록(쪽마다), at: 지금까지 읽은 대사 수 */
+  SL.speechParts = function (sentence, who, at) {
+    var out = [], bits = String(sentence).split('"'), n = at || 0;
+    bits.forEach(function (b, i) {
+      var t = b.replace(/^\s+|\s+$/g, '');
+      var inside = i % 2 === 1;
+      if (inside) { var w = (who && who[n]) || 'narr'; n++; if (/[가-힣A-Za-z0-9]/.test(t)) out.push({ t: t, who: w }); }
+      else if (/[가-힣A-Za-z0-9]/.test(t)) out.push({ t: t, who: 'narr' });
+    });
+    if (!out.length) out.push({ t: String(sentence), who: 'narr' });
+    return { parts: out, at: n };
+  };
+  /* 목소리 높낮이 (기기 목소리일 때 인물을 구분한다) */
+  SL.TONES = [['normal', '보통', 1], ['high', '높게', 1.3], ['higher', '아주 높게', 1.6], ['low', '낮게', 0.8], ['deep', '굵게', 0.6]];
+  SL.STYLES = [['F1', '여자 1'], ['F2', '여자 2'], ['F3', '여자 3'], ['F4', '여자 4'], ['F5', '여자 5'], ['M1', '남자 1'], ['M2', '남자 2'], ['M3', '남자 3'], ['M4', '남자 4'], ['M5', '남자 5']];
+  SL.toneOf = function (id) { for (var i = 0; i < SL.TONES.length; i++) if (SL.TONES[i][0] === id) return SL.TONES[i][2]; return 1; };
   SL.stopSpeak = stop;
 })(window);

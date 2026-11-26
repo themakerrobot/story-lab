@@ -211,15 +211,27 @@
   SL.renderScene = renderScene;
 
   /* 책 한 권의 쪽 목록: [표지, 문장 쪽…, 마지막 장면, 끝] (마지막 장면은 문장 쪽의 마지막) */
+  /* 꾸미기 적용: book.swap = { 원래 이모지: 바꾼 이모지 } (책 전체 인물), book.deco = { 쪽 번호: { bg, tm, obj } } (그 쪽만) */
+  function decorate(book, pages) {
+    var swap = book.swap || {}, deco = book.deco || {};
+    var sw = function (e) { return e && swap[e] ? swap[e] : e; };
+    return pages.map(function (p, k) {
+      var sc = p.sc || {}, d = deco[k] || {};
+      var nsc = { bg: d.bg && BG[d.bg] ? d.bg : sc.bg, tm: d.tm || sc.tm, cast: (sc.cast || []).map(sw), vil: sw(sc.vil), obj: Array.isArray(d.obj) ? d.obj.slice(0, 2) : (sc.obj || []), mood: sc.mood, guest: sc.guest };
+      return { t: p.t, part: p.part, spk: p.spk || [], sc: nsc };
+    });
+  }
+  SL.decorate = decorate;
+
   function buildBook(book) {
-    var pages = Array.isArray(book.pages) && book.pages.length ? book.pages : SL.story.compose(book);
+    var pages = decorate(book, Array.isArray(book.pages) && book.pages.length ? book.pages : SL.story.compose(book));
     var first = pages[0] && pages[0].sc ? pages[0].sc : { bg: 'meadow', cast: ['🙂'] };
     var coverBg = (pages[2] && pages[2].sc && pages[2].sc.bg) || first.bg;
     var lastSc = pages[pages.length - 1] ? pages[pages.length - 1].sc : first;
     var list = [{ kind: 'cover', sc: { bg: coverBg, tm: 'day', cast: lastSc.cast, obj: [], mood: 'happy' } }];
     pages.forEach(function (p) {
       var se = SL.splitEmoji(p.t);
-      list.push({ kind: 'text', t: se.text, part: p.part, sc: p.sc });
+      list.push({ kind: 'text', t: se.text, part: p.part, sc: p.sc, spk: p.spk, k: list.length - 1 });
     });
     list.push({ kind: 'end', sc: { bg: lastSc.bg, tm: lastSc.tm, cast: lastSc.cast, obj: [], mood: 'happy' } });
     return list;

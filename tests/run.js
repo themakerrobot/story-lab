@@ -38,7 +38,7 @@ function fakeSpeech(mode) {
       resume() {}, pause() {},
       cancel() { speaking = false; },
       speak(u) {
-        log.push(u.text);
+        log.push(u.text); (window.__pitch = window.__pitch || []).push(u.pitch || 1);
         const cur = document.querySelector('.s.cur');
         marks.push(cur ? cur.textContent : null);
         speaking = true;
@@ -233,7 +233,8 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     const { ctx, page } = await newPage();
     await page.goto(BASE);
     await page.click('[data-act=new]'); await page.click('[data-world="detective"]');
-    for (const k of ['cast', 'events', 'places']) for (let n = 0; n < 3; n++) await page.click(`[data-plus="${k}"]`);
+    for (const k of ['cast', 'events', 'places']) for (let n = 0; n < 5; n++) { if (await page.isEnabled(`[data-plus="${k}"]`)) await page.click(`[data-plus="${k}"]`); }
+    assert(!(await page.isEnabled('[data-plus="cast"]')), '최댓값에서 + 가 꺼지지 않음');
     await page.click('[data-toggle=villain]');
     const v = await page.evaluate(() => ({ cast: document.querySelector('[data-v=cast]').textContent, ev: document.querySelector('[data-v=events]').textContent, pl: document.querySelector('[data-v=places]').textContent }));
     assert(v.cast === '4' && v.ev === '3' && v.pl === '3', JSON.stringify(v));
@@ -260,7 +261,10 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     const r = await page.evaluate(() => {
       const b = JSON.parse(localStorage.getItem('storylab-v1')).books[0];
       const expect = [b.title, '지은이 ' + b.author + '.'];
-      b.pages.forEach((p) => expect.push(...SL.splitSentences(SL.splitEmoji(p.t).text)));
+      SL.buildBook(b).filter((p) => p.kind === 'text').forEach((p) => {
+        let at = 0;
+        SL.splitSentences(p.t).forEach((s) => { const r = SL.speechParts(s, p.spk, at); at = r.at; r.parts.forEach((x) => expect.push(x.t)); });
+      });
       const n = expect.length;
       return { spoken: window.__spoken.slice(-n), marks: window.__marks.slice(-n), expect, ui: window.__spoken.length - n };
     });
@@ -271,7 +275,7 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     const r = await readTest('normal');
     assert(JSON.stringify(r.spoken) === JSON.stringify(r.expect), '읽은 순서가 다름\n' + JSON.stringify(r.spoken) + '\n' + JSON.stringify(r.expect));
     const norm = (x) => x.replace(/\s+/g, ' ').replace(/[.]$/, '').trim();
-    r.spoken.forEach((s, i) => assert(r.marks[i] && norm(r.marks[i]) === norm(s), `짚은 문장이 다름: ${r.marks[i]} / ${s}`));
+    r.spoken.forEach((s, i) => assert(r.marks[i] && norm(r.marks[i]).indexOf(norm(s)) >= 0, `짚은 문장이 다름: ${r.marks[i]} / ${s}`));
   });
   await test('읽어 주기: onend 가 오지 않는 엔진에서도 시간 대비로 넘어감', async () => {
     const r = await readTest('silent');
@@ -319,6 +323,73 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     track(page); await ctx.close();
   });
 
+  await test('꾸미기: 배경 바꾸기(그 쪽만), 인물 이모지 바꾸기(책 전체), 스티커 붙이기·떼기, 새로 고침 뒤 유지', async () => {
+    const { ctx, page } = await newPage();
+    await page.goto(BASE);
+    await makeBook(page, { preset: 'kid', world: 'adv' });
+    if ((await page.textContent('[data-act=play]')).indexOf('멈추기') >= 0) await page.click('[data-act=play]');
+    for (let n = 0; n < 40 && (await page.textContent('[data-pno]')) !== '표지'; n++) await page.keyboard.press('ArrowLeft');
+    for (let n = 0; n < 3; n++) await page.click('[data-act=next]'); /* 3쪽: 장소 쪽 */
+    const before = await page.getAttribute('.pg .scene', 'data-bg');
+    const hero0 = await page.textContent('.pg .scene .ch.hero');
+    await page.click('[data-act=decorate]');
+    await page.click('[data-tab=bg]');
+    const target = before === 'castle' ? 'candy' : 'castle';
+    await page.click(`.bgopt[data-bg="${target}"]`);
+    await page.click('[data-tm=night]');
+    await page.click('[data-tab=art]');
+    await page.click(`[data-char="${hero0}"]`);
+    await page.click('[data-emo="🦄"]');
+    await page.click('[data-act=add-sticker]');
+    await page.click('[data-emo="🎈"]');
+    await page.click('[data-act=deco-save]');
+    assert((await page.getAttribute('.pg .scene', 'data-bg')) === target, '배경이 안 바뀜');
+    assert((await page.getAttribute('.pg .scene', 'class')).indexOf('tm-night') >= 0, '밤으로 안 바뀜');
+    assert((await page.textContent('.pg .scene .ch.hero')) === '🦄', '주인공 그림이 안 바뀜');
+    const obs = await page.$$eval('.pg .scene .ob', (a) => a.map((x) => x.textContent));
+    assert(obs.indexOf('🎈') >= 0 && obs.length <= 2, '스티커 ' + JSON.stringify(obs));
+    await page.click('[data-act=next]');
+    assert((await page.textContent('.pg .scene .ch.hero')) === '🦄', '다른 쪽 주인공이 안 바뀜(책 전체 적용)');
+    await page.reload();
+    await page.waitForSelector('[data-book]');
+    await page.click('[data-book] .open');
+    assert((await page.textContent('.pg .scene .ch.hero')) === '🦄', '표지에 안 바뀜');
+    for (let n = 0; n < 3; n++) await page.click('[data-act=next]');
+    assert((await page.getAttribute('.pg .scene', 'data-bg')) === target, '새로 고친 뒤 배경이 안 남음');
+    await page.click('[data-act=decorate]'); await page.click('[data-tab=art]');
+    const nObj = (await page.$$('[data-del-obj]')).length;
+    await page.click('[data-del-obj="0"]');
+    assert((await page.$$('[data-del-obj]')).length === nObj - 1, '스티커가 안 떼짐');
+    await page.click('[data-act=deco-reset]'); await page.click('[data-act=deco-save]');
+    assert((await page.getAttribute('.pg .scene', 'data-bg')) === before, '처음대로가 안 됨');
+    track(page); await ctx.close();
+  });
+
+  await test('목소리: 해설과 대사를 나눠 읽고, 인물마다 정한 목소리(높낮이)로 읽음', async () => {
+    const { ctx, page } = await newPage();
+    await page.goto(BASE);
+    await makeBook(page, { preset: 'baby', world: 'adv' });
+    if ((await page.textContent('[data-act=play]')).indexOf('멈추기') >= 0) await page.click('[data-act=play]');
+    for (let n = 0; n < 40 && (await page.textContent('[data-pno]')) !== '표지'; n++) await page.keyboard.press('ArrowLeft');
+    await page.click('[data-act=decorate]');
+    assert(await page.$('[data-role=narr]') && await page.$('[data-role=hero]'), '해설·주인공 목소리 칸이 없음');
+    const friendRole = await page.$$eval('[data-role^="f:"]', (a) => a.map((x) => x.getAttribute('data-role')));
+    assert(friendRole.length === 1, '친구 목소리 칸 수 ' + friendRole.length);
+    await page.click('[data-role=hero] [data-tone=deep]');
+    await page.click(`[data-role="${friendRole[0]}"] [data-tone=higher]`);
+    await page.click('[data-act=deco-save]');
+    await page.evaluate(() => { window.__spoken.length = 0; window.__pitch = []; });
+    await page.click('[data-act=play]');
+    await page.waitForFunction(() => document.querySelector('[data-pno]').textContent === '끝', null, { timeout: 30000 });
+    const r = await page.evaluate(() => ({ s: window.__spoken.slice(), p: window.__pitch.slice() }));
+    const iHero = r.s.findIndex((x) => x === '좋아, 출발!');
+    assert(iHero >= 0 && r.p[iHero] === 0.6, '주인공 대사 높낮이 ' + r.p[iHero]);
+    const iNarr = r.s.findIndex((x) => x.indexOf('살았어요') >= 0);
+    assert(iNarr >= 0 && r.p[iNarr] === 1, '해설 높낮이 ' + r.p[iNarr]);
+    assert(r.p.indexOf(1.6) >= 0, '친구 대사를 친구 목소리로 읽지 않음');
+    track(page); await ctx.close();
+  });
+
   /* 4. 반응형 */
   const SIZES = [[320, 568], [360, 640], [390, 844], [412, 360], [640, 320], [768, 1024], [1024, 768], [1180, 820], [1366, 768], [1920, 1080]];
   await test('반응형: ' + SIZES.map((s) => s.join('×')).join(', ') + ' 모든 화면', async () => {
@@ -361,6 +432,9 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
       await check(L + ' 읽기(표지)');
       await page.click('[data-act=next]'); await page.click('[data-act=next]'); await page.click('[data-act=next]');
       await check(L + ' 읽기(글)');
+      await page.click('[data-act=decorate]'); await page.click('[data-tab=bg]'); await check(L + ' 꾸미기(배경)');
+      await page.click('[data-tab=art]'); await page.click('[data-act=add-sticker]'); await check(L + ' 꾸미기(그림)');
+      await page.click('[data-tab=voice]'); await check(L + ' 꾸미기(목소리)'); await page.click('[data-act=deco-cancel]');
       const bottomOk = await page.evaluate(() => {
         const b = document.querySelector('.bar.bottom').getBoundingClientRect();
         const s = document.querySelector('.pg .scene').getBoundingClientRect();

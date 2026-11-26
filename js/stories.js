@@ -24,6 +24,9 @@
     { id: 'gentle', e: '🥰', n: '마음씨 고운', adj: '마음씨 고운', t: '{H:은/는} 친구를 잘 도와주는 마음 따뜻한 아이였어요.' }
   ];
 
+  /* 바람을 말하는 쪽의 주인공 대사 (성격마다 다르게). 모든 책에서 주인공이 한 번은 말한다 */
+  var HERO_SAY = { brave: '나는 할 수 있어! 출발!', shy: '조금 무섭지만… 해 볼래!', curious: '어떤 일이 생길까? 정말 궁금해!', playful: '히히, 신나는 일이 생길 것 같아!', gentle: '친구들과 함께라면 더 좋겠다!', _: '좋아, 출발!' };
+
   /* ---------- 가방 속 물건: 나중에 해결 카드로 다시 나온다 (원인 → 결과) ---------- */
   var ITEMS = [
     { id: 'flashlight', e: '🔦', n: '손전등', tags: ['light', 'find'], use: '딸깍! 불을 켜자 주위가 환해졌어요.' },
@@ -596,7 +599,15 @@
         obj: (o.obj || []).filter(Boolean).slice(0, 2), mood: o.mood || 'calm', guest: o.guest || null
       };
     }
-    function page(text, part, sc) { if (emit) pages.push({ t: text, part: part, sc: sc }); }
+    /* 대사 임자: 따옴표 대사 하나마다 누가 말하는지 적어 둔다 (narr 해설, hero 주인공, f:친구, v 말썽꾼) */
+    var spk = [];
+    function Q(who, text) { var n = Math.floor((String(text).match(/"/g) || []).length / 2); for (var q = 0; q < n; q++) spk.push(who); return text; }
+    function page(text, part, sc) {
+      var n = Math.floor((String(text).match(/"/g) || []).length / 2);
+      while (spk.length < n) spk.push('narr');
+      if (emit) pages.push({ t: text, part: part, sc: sc, spk: spk.slice(0, n) });
+      spk = [];
+    }
     for (var si = 0; si < upto && si < steps.length; si++) {
       var step = steps[si], id = picks[step.key];
       if (id == null) throw new Error('고르지 않은 단계: ' + step.key);
@@ -610,7 +621,8 @@
           var HI = (st.trait ? st.trait.adj + ' ' : '') + J(hn, '이/가');
           page(T(st, st.w.intro, { HI: HI }) + (st.trait ? ' ' + T(st, st.trait.t) : ''), 'start', scene({ obj: [] }));
           var itemId = st.cfg.detail.item ? nextPick('item') : null, it = itemId ? byId(ITEMS, itemId) : null;
-          page(T(st, st.goal.t) + (it ? ' ' + T(st, '그래서 가방에 {I:을/를} 챙겼어요.', { I: it.n }) : ''), 'start', scene({ obj: [st.goal.e, it && it.e] }));
+          var hs = HERO_SAY[st.trait ? st.trait.id : '_'];
+          page(T(st, st.goal.t) + (it ? ' ' + T(st, '그래서 가방에 {I:을/를} 챙겼어요.', { I: it.n }) : '') + ' ' + Q('hero', '"' + hs + '"'), 'start', scene({ obj: [st.goal.e, it && it.e] }));
           break;
         }
         case 'item': { var item = byId(ITEMS, id); if (!item) throw new Error('없는 물건 ' + id); st.items.push(item); break; }
@@ -633,13 +645,13 @@
           if (!fr || st.w.friends.indexOf(id) < 0 || st.friends.some(function (x) { return x.id === id; })) throw new Error('고를 수 없는 친구 ' + id);
           var txt = step.part === 'start' ? T(st, '{P}에서 {F:을/를} 만났어요.', { F: fr.n }) : T(st, '그때 {F:이/가} 다가와 말했어요.', { F: fr.n });
           st.friends.push(fr);
-          page(txt + ' "' + fr.say + '"', step.part, scene({ obj: [] }));
+          page(txt + ' ' + Q('f:' + fr.id, '"' + fr.say + '"'), step.part, scene({ obj: [] }));
           break;
         }
         case 'vil': {
           st.vil = villain(id); if (!st.vil || st.w.villains.indexOf(id) < 0) throw new Error('없는 말썽꾼 ' + id);
           st.vstate = 'here';
-          page(T(st, '그때, 말썽꾼 {V:이/가} 나타났어요!') + ' ' + st.vil.say, 'event', scene({ mood: 'tense' }));
+          page(T(st, '그때, 말썽꾼 {V:이/가} 나타났어요!') + ' ' + Q('v', st.vil.say), 'event', scene({ mood: 'tense' }));
           break;
         }
         case 'ev': case 'vev': {
@@ -649,7 +661,7 @@
           st.ev = ev; st.usedEv[id] = 1; st.feel = null;
           var E = st.cfg.events;
           var lead2 = step.kind === 'vev' ? '그러더니 ' : step.i === 0 ? '그런데 ' : (step.i === E - 1 && E >= 3 ? '그때, 가장 큰 일이 벌어졌어요! ' : '그런데 이번에는 ');
-          var et = lead2 + T(st, ev.t);
+          var et = lead2 + Q(step.kind === 'vev' ? 'v' : 'narr', T(st, ev.t));
           var feelId = st.cfg.detail.feel ? nextPick('feel' + step.i) : null, fe = feelId ? byId(FEELS, feelId) : null;
           if (fe) et += ' ' + T(st, fe.t);
           page(et, 'event', scene({ obj: [ev.e, fe && fe.e], mood: 'tense' }));
@@ -662,19 +674,20 @@
           var tag, stxt, cat, guest = null;
           if (c.kind === 'item') {
             tag = inter(c.item.tags, st.ev.need); cat = 'tool';
-            stxt = T(st, '{H:은/는} {PRE}가방에서 {I:을/를} 꺼냈어요.', { I: c.item.n }) + ' ' + c.item.use;
+            stxt = T(st, '{H:은/는} {PRE}가방에서 {I:을/를} 꺼냈어요.', { I: c.item.n }) + ' ' + Q('hero', c.item.use);
           } else if (c.kind === 'friend') {
             tag = c.sk; cat = 'together';
-            stxt = T(st, SKILL_T[c.sk], { F: c.fr.n });
+            stxt = Q('f:' + c.fr.id, T(st, SKILL_T[c.sk], { F: c.fr.n }));
           } else {
             tag = inter(c.s.fix, st.ev.need); cat = c.s.cat;
             var X = c.s.id === 'ask' ? SL.pick(st.w.helpers, st.rnd) : null;
             if (X) guest = '🙋';
-            stxt = T(st, c.s.t, X ? { X: X } : null);
+            stxt = Q(c.s.id === 'together' ? 'narr' : 'hero', T(st, c.s.t, X ? { X: X } : null));
           }
           st.cats[cat] = (st.cats[cat] || 0) + 1;
-          var res;
+          var res, resWho = 'narr';
           if (st.vstate === 'here') {
+            resWho = 'v';
             var friendly = cat === 'kind' || (c.kind === 'item' && c.item.tags.indexOf('kind') >= 0);
             var stole = st.ev.id === 'steal';
             if (friendly) {
@@ -693,7 +706,7 @@
           }
           var callback = c.kind === 'item' ? ' ' + T(st, '처음에 챙긴 {I:이/가} 큰 도움이 되었어요!', { I: c.item.n }) : '';
           if (c.kind === 'item') st.toolUsed = true;
-          page(stxt + ' ' + res + callback, 'solve', scene({ obj: [c.e, c.kind === 'item' ? null : st.ev.e], mood: 'happy', vil: null, guest: guest }));
+          page(stxt + ' ' + Q(resWho, res) + callback, 'solve', scene({ obj: [c.e, c.kind === 'item' ? null : st.ev.e], mood: 'happy', vil: null, guest: guest }));
           st.feel = null;
           break;
         }
@@ -749,6 +762,8 @@
   function allOptionsAt(book, i) { var steps = plan(book.cfg, book.ep); return allOptions(steps[i], stateAt(book, i)); }
   function question(book, i) { var steps = plan(book.cfg, book.ep); var st = stateAt(book, i); return T(st, Q[steps[i].kind]); }
   function compose(book) { return run(book, null, true).pages; }
+  /* 지금까지 고른 카드로 만든 쪽 (만드는 중에 "원고"로 보여 준다) */
+  function draft(book, upto) { try { return run(book, upto, true).pages; } catch (e) { return []; } }
   /* 남은 단계를 무작위로 채운다 (테스트, 쪽 수 어림, "골라 줘") */
   function randomFill(book, r, from) {
     var steps = plan(book.cfg, book.ep);
@@ -778,5 +793,5 @@
   }
 
   SL.data = { HEROES: HEROES, TRAITS: TRAITS, ITEMS: ITEMS, TIMES: TIMES, PLACES: PLACES, FRIENDS: FRIENDS, VILLAINS: VILLAINS, WORLDS: WORLDS, WORLD: WORLD, EVENTS: EVENTS, VEVENTS: VEVENTS, FEELS: FEELS, SOLVES: SOLVES, ENDS: ENDS, OUTCOMES: OUTCOMES, PRESETS: PRESETS, FULL_DETAIL: FULL_DETAIL, PART: PART };
-  SL.story = { plan: plan, normCfg: normCfg, newBook: newBook, stateAt: stateAt, optionsAt: optionsAt, allOptionsAt: allOptionsAt, question: question, compose: compose, randomFill: randomFill, autoTitle: autoTitle, estimate: estimate, pickEmoji: pickEmoji };
+  SL.story = { plan: plan, normCfg: normCfg, newBook: newBook, stateAt: stateAt, optionsAt: optionsAt, allOptionsAt: allOptionsAt, question: question, compose: compose, draft: draft, randomFill: randomFill, autoTitle: autoTitle, estimate: estimate, pickEmoji: pickEmoji };
 })(window.SL);
