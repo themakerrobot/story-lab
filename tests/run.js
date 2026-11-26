@@ -676,7 +676,11 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
       const page = await ctx.newPage();
       page.errors = [];
       page.on('pageerror', (e) => page.errors.push(e.message));
+      /* 두 번째 방문처럼 서비스 워커가 페이지를 맡아 교차 출처 격리(여러 스레드)가 켜진 상태에서 확인한다 */
       await page.goto(BASE);
+      await page.evaluate(() => navigator.serviceWorker.ready);
+      await page.reload();
+      assert(await page.evaluate(() => crossOriginIsolated), '두 번째 방문에서 교차 출처 격리가 안 켜짐');
       const r = await page.evaluate(async () => {
         const t0 = performance.now();
         await SL.loadModel();
@@ -686,6 +690,7 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
       });
       console.log(`    ${r.src}: 로딩 ${r.load.toFixed(1)}s, 합성 ${r.synth.toFixed(1)}s, 소리 ${(r.samples / r.rate).toFixed(2)}s, 최대 진폭 ${r.peak.toFixed(3)}`);
       assert(r.samples / r.rate > 0.5 && r.peak > 0.01, '소리가 비어 있음');
+      assert(r.load < 80, '여러 스레드로 준비하다 멈춤 (한 스레드로 다시 준비함) ' + r.load.toFixed(1) + 's');
       track(page); await ctx.close(); if (b2 !== browser) await b2.close();
     });
   }

@@ -196,15 +196,41 @@
     model.state = 'loading'; model.msg = 'AI 목소리를 준비하는 중'; model.err = ''; model.pct = 0; modelEmit();
     var make = global.__SL_FAKE_TTS ? Promise.resolve({ load: function () { return Promise.resolve(); }, synth: function (t, o) { return global.__SL_FAKE_TTS.synth(t, o); }, sampleRate: global.__SL_FAKE_TTS.sampleRate || 16000 })
       : import('./tts-client.js').then(function (m) { return m.createTTS(); });
+    function onStatus(msg) {
+      model.msg = msg;
+      var m = /([\d.]+) \/ ([\d.]+) MB/.exec(msg), step = /\((\d)\/4\)/.exec(msg);
+      if (m && step) model.pct = Math.round(((+step[1] - 1) + (+m[1] / +m[2])) / 4 * 100);
+      else if (step) model.pct = Math.max(model.pct, Math.round(+step[1] / 4 * 100));
+      modelEmit();
+    }
+    /* 지킴이: 여러 스레드로 준비하다 소식 없이 오래 멈추면(기기·브라우저에 따라 생길 수 있음) 워커를 버리고 한 스레드로 다시 준비한다.
+       내려받는 동안에는 조각마다 소식이 오므로, 느린 인터넷을 멈춤으로 보지 않는다 */
+    var STALL_MS = global.__SL_STALL_MS || 90000;
+    function guarded(tts, single) {
+      if (!tts.inWorker || single) return tts.load(onStatus, { single: single });
+      return new Promise(function (resolve, reject) {
+        var last = Date.now(), done = false;
+        var timer = setInterval(function () {
+          if (done || Date.now() - last < STALL_MS) return;
+          done = true; clearInterval(timer);
+          console.warn('[tts] 준비가 멈춰 한 스레드로 다시 준비');
+          try { tts.terminate(); } catch (e) { }
+          model.msg = 'AI 목소리를 다시 준비하는 중'; modelEmit();
+          import('./tts-client.js').then(function (m) { return m.createTTS(); }).then(function (t2) {
+            model.tts = t2;
+            return guarded(t2, true);
+          }).then(resolve, reject);
+        }, 1000);
+        tts.load(function (msg) { last = Date.now(); onStatus(msg); }).then(function () {
+          if (done) return; done = true; clearInterval(timer); resolve();
+        }, function (e) {
+          if (done) return; done = true; clearInterval(timer); reject(e);
+        });
+      });
+    }
     model.loading = make.then(function (tts) {
       model.tts = tts;
-      return tts.load(function (msg) {
-        model.msg = msg;
-        var m = /([\d.]+) \/ ([\d.]+) MB/.exec(msg), step = /\((\d)\/4\)/.exec(msg);
-        if (m && step) model.pct = Math.round(((+step[1] - 1) + (+m[1] / +m[2])) / 4 * 100);
-        else if (step) model.pct = Math.max(model.pct, Math.round(+step[1] / 4 * 100));
-        modelEmit();
-      });
+      return guarded(tts, false);
     }).then(function () {
       model.state = 'ready'; model.msg = 'AI 목소리 준비 완료'; model.pct = 100; modelEmit();
       return model.tts;

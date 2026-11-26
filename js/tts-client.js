@@ -38,10 +38,18 @@ class WorkerTTS {
     };
   }
 
-  async load(onStatus) {
+  async load(onStatus, { single = false } = {}) {
     this.onStatus = onStatus;
-    const r = await this.call('load').promise;
+    const r = await this.call('load', { single }).promise;
     Object.assign(this, { backend: r.backend, source: r.source, sampleRate: r.sampleRate });
+  }
+
+  // 멈춘 워커를 버린다. 기다리던 일은 모두 실패로 끝낸다
+  terminate() {
+    this.worker.terminate();
+    const err = new Error('AI 목소리 준비가 멈춰 다시 시작해요');
+    for (const j of this.jobs.values()) j.reject(err);
+    this.jobs.clear();
   }
 
   async style(voice) { await this.call('style', { voice }).promise; }

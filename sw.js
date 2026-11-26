@@ -5,10 +5,10 @@
    - Hugging Face(AI 목소리 모델): 건드리지 않음. tts.js 가 Cache Storage 에 직접 보관한다
    - 같은 사이트 응답에 COOP/COEP 를 붙여 교차 출처 격리를 켠다 → 음성 엔진이 CPU 여러 코어를 쓴다
    고칠 때마다 CACHE 버전을 올린다 */
-var CACHE = 'storylab-shell-v9';
+var CACHE = 'storylab-shell-v10';
 var SHELL = [
   './', './index.html', './css/app.css', './css/themaker-ui.css', './js/icons.js', './js/video.js', './fonts/gowun/gowun.css', './img/pibo-logo.png', './fonts/pretendard.css', './js/core.js', './js/stories.js', './js/scenes.js', './js/app.js',
-  './js/tts-client.js', './js/tts-worker.js', './js/tts.js', './manifest.webmanifest',
+  './js/tts-client.js', './js/tts-worker.js', './js/tts.js', './vendor/ort/ort-wasm-simd-threaded.jsep.mjs', './manifest.webmanifest',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './licenses/OpenRAIL-M.txt', './licenses/onnxruntime-MIT.txt', './licenses/Supertonic-code-MIT.txt', './licenses/Supertonic3-int8-MODIFICATIONS.md'
 ];

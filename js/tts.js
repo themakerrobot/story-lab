@@ -21,7 +21,7 @@ const CACHE_NAME = 'storylab-tts';
 
 let ort = null;
 // ONNX Runtime 을 CDN → 같은 사이트 순으로 불러온다. wasm 바이너리는 Cache Storage 에 보관해 오프라인에서도 씀
-async function loadOrt(onStatus) {
+async function loadOrt(onStatus, single) {
   if (ort) return ort;
   const tried = [];
   for (const base of [ORT_CDN, ORT_LOCAL]) {
@@ -31,9 +31,10 @@ async function loadOrt(onStatus) {
       const wasm = await fetchCached(`${base}${ORT_FILES.wasm}`, (n, total, cached) => {
         if (!cached) onStatus?.(`음성 엔진 내려받는 중 ${(n / 1048576).toFixed(1)}${total ? ` / ${(total / 1048576).toFixed(1)}` : ''} MB`);
       });
-      mod.env.wasm.wasmPaths = { mjs: `${base}${ORT_FILES.mjs}`, wasm: `${base}${ORT_FILES.wasm}` };
+      // 여러 스레드로 돌 때 ORT 는 이 mjs 로 보조 워커를 띄운다. 워커는 다른 출처(CDN) 스크립트로 못 띄워서 멈추므로 늘 같은 사이트 사본을 쓴다
+      mod.env.wasm.wasmPaths = { mjs: `${ORT_LOCAL}${ORT_FILES.mjs}`, wasm: `${base}${ORT_FILES.wasm}` };
       mod.env.wasm.wasmBinary = wasm;
-      mod.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+      mod.env.wasm.numThreads = !single && self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
       ort = mod;
       console.info(`[tts] ONNX Runtime: ${base === ORT_CDN ? 'jsDelivr' : '같은 사이트'}`);
       return ort;
@@ -191,10 +192,11 @@ export class SupertonicTTS {
 
   get sampleRate() { return this.cfgs.ae.sample_rate; }
 
-  async load(onStatus) {
+  // single: 여러 스레드로 준비하다 멈췄을 때 한 스레드로 다시 준비한다
+  async load(onStatus, { single = false } = {}) {
     const t0 = performance.now();
     try { await navigator.storage?.persist?.(); } catch (_) { /* 지원 안 함 */ }
-    await loadOrt(onStatus);
+    await loadOrt(onStatus, single);
     const names = [
       ['dp', 'duration_predictor.onnx'],
       ['enc', 'text_encoder.onnx'],
