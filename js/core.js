@@ -1,5 +1,5 @@
 /* 그림책 공방 — 공통 도구
-   조사 고르기, 글자 틀 채우기, 저장, 이모지 분리, 문장 나누기, 읽어 주기(기기 목소리 / AI 목소리) */
+   조사 고르기, 글자 틀 채우기, 저장, 이모지 분리, 문장 나누기, 읽어 주기(AI 목소리) */
 (function (global) {
   'use strict';
   var SL = global.SL = global.SL || {};
@@ -141,7 +141,7 @@
 
   /* ---------- 저장 ---------- */
   var KEY = 'storylab-v1';
-  function defaults() { return { v: 1, author: '', rate: 1, voice: 'device', style: 'F1', books: [] }; }
+  function defaults() { return { v: 1, author: '', rate: 1, style: 'F1', aiReady: false, books: [] }; }
   function load() {
     var d = defaults();
     try {
@@ -162,50 +162,19 @@
   }
   SL.store = { KEY: KEY, load: load, save: save, defaults: defaults };
 
-  /* ---------- 기기 목소리 (Web Speech API) ---------- */
+  /* ---------- 오디오 ---------- */
   var ua = global.navigator ? navigator.userAgent : '';
   var IOS = /iP(ad|hone|od)/.test(ua) || (/Macintosh/.test(ua) && global.navigator && navigator.maxTouchPoints > 1);
   SL.IOS = IOS;
   SL.isMobile = function () { return IOS || /Android|Mobile/i.test(ua); };
-  function synth() { try { return global.speechSynthesis || null; } catch (e) { return null; } }
-  var voices = [];
-  function loadVoices() { var s = synth(); try { voices = s && s.getVoices ? s.getVoices() || [] : []; } catch (e) { voices = []; } }
-  if (synth()) {
-    loadVoices();
-    try { synth().addEventListener('voiceschanged', loadVoices); } catch (e) { try { synth().onvoiceschanged = loadVoices; } catch (e2) { } }
-  }
-  /* 장난감 목소리(Grandma, Rocko 등)는 뺀다. 기기 안 목소리(localService)를 먼저 고른다:
-     네트워크 목소리는 문장을 서버로 보내므로 온디바이스 원칙에 어긋난다 */
-  var NOVELTY = /^(Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley|Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Junior|Kathy|Fred|Ralph)\b/i;
-  function koVoices() {
-    if (!voices.length) loadVoices();
-    return voices.filter(function (x) { return x && x.lang && x.lang.replace('_', '-').toLowerCase().indexOf('ko') === 0 && !NOVELTY.test(x.name || ''); });
-  }
-  function pickVoice() {
-    var v = koVoices();
-    if (!v.length) return null;
-    var local = v.filter(function (x) { return x.localService; });
-    return local.filter(function (x) { return x.default; })[0] || local[0] || v.filter(function (x) { return x.default; })[0] || v[0];
-  }
-  SL.voiceInfo = function () {
-    var v = koVoices();
-    return { has: !!synth(), ko: v.length, local: v.filter(function (x) { return x.localService; }).length, picked: (pickVoice() || {}).name || '' };
-  };
-
-  var unlocked = false, audioCtx = null;
+  var audioCtx = null;
   function getAudio() {
     if (!audioCtx) { try { var C = global.AudioContext || global.webkitAudioContext; if (C) audioCtx = new C(); } catch (e) { } }
     return audioCtx;
   }
-  /* iPad·iPhone: 첫 터치 때 소리 없는 음성을 한 번 내서 그 뒤의 음성을 허락받는다. AI 목소리용 오디오도 함께 깨운다 */
-  function unlock() {
-    var a = getAudio();
-    if (a && a.state === 'suspended') { try { a.resume(); } catch (e) { } }
-    if (unlocked) return;
-    unlocked = true;
-    var s = synth();
-    if (IOS && s) { try { var z = new global.SpeechSynthesisUtterance(' '); z.volume = 0; z.lang = 'ko-KR'; s.speak(z); } catch (e) { } }
-  }
+  SL.audio = getAudio;
+  /* iPad·iPhone·Chrome 은 터치 안에서 오디오를 깨워야 소리가 난다 → 첫 터치 때 깨워 둔다 */
+  function unlock() { var a = getAudio(); if (a && a.state === 'suspended') { try { a.resume(); } catch (e) { } } }
   if (global.document) ['touchend', 'click', 'keydown'].forEach(function (t) { document.addEventListener(t, unlock, { capture: true, passive: true }); });
 
   /* 글자 수로 잡는 예상 시간: 1초에 약 4글자 + 1.2초, 빠르기에 맞춰 줄인다 */
@@ -215,78 +184,29 @@
   }
   SL.expectMs = expectMs;
 
-  /* 한 문장을 기기 목소리로 읽는다. 끝나면 done()을 꼭 한 번만 부른다.
-     onend가 오지 않는 기기 대비: 예상 시간이 지나면 speaking을 보고, 아직 말하는 중이면 최대 3배까지 기다린다 */
-  var lastUtter = null;
-  function deviceSay(text, rate, done, pitch) {
-    var s = synth();
-    var finished = false, timers = [];
-    var t0 = Date.now(), expect = expectMs(text, rate);
-    function finish(ok) {
-      if (finished) return;
-      finished = true;
-      timers.forEach(clearTimeout);
-      done(ok);
-    }
-    function check() {
-      var busy = false;
-      try { busy = !!(s && (s.speaking || s.pending)); } catch (e) { }
-      if (busy && Date.now() - t0 < expect * 3) timers.push(setTimeout(check, ms(400)));
-      else finish(true);
-    }
-    /* 대비 타이머는 실제로 말하기 시작한 때부터 잰다 (안드로이드에서 80ms 늦게 말하는 사이에 끝난 것으로 보지 않게) */
-    function arm() { t0 = Date.now(); timers.push(setTimeout(check, expect)); }
-    if (!s || !global.SpeechSynthesisUtterance) { arm(); return { cancel: function () { finish(false); } }; }
-    var u;
-    try {
-      u = new global.SpeechSynthesisUtterance(String(text));
-      u.lang = 'ko-KR';
-      u.rate = rate || 1;
-      u.pitch = pitch || 1;
-      u.volume = 1;
-      var v = pickVoice();
-      if (v) u.voice = v;
-      u.onend = function () { finish(true); };
-      u.onerror = function (e) { if (e && (e.error === 'interrupted' || e.error === 'canceled')) return; finish(true); };
-    } catch (e) { arm(); return { cancel: function () { finish(false); } }; }
-    var go = function () {
-      if (finished) return;
-      arm();
-      try { s.resume(); } catch (e) { }
-      lastUtter = u; /* 말하는 도중 가비지 수거로 끊기지 않게 잡아 둔다 */
-      try { s.speak(u); } catch (e) { }
-    };
-    /* 안드로이드 Chrome은 cancel() 바로 뒤 speak()를 자주 버린다: 말하는 중일 때만 끊고 80ms 뒤에 말한다.
-       iPad·iPhone은 늦추면 터치 밖이 되어 막히므로 바로 말한다 */
-    var busyNow = false;
-    try { busyNow = s.speaking || s.pending; } catch (e) { }
-    if (busyNow) {
-      try { s.cancel(); } catch (e) { }
-      if (IOS) go(); else timers.push(setTimeout(go, 80));
-    } else go();
-    return {
-      cancel: function () {
-        if (finished) return;
-        finished = true;
-        timers.forEach(clearTimeout);
-        try { s.cancel(); } catch (e) { }
-      }
-    };
-  }
-
-  /* ---------- AI 목소리 (Supertonic 3, 기기 안에서 계산) ---------- */
-  var model = { state: 'off', tts: null, msg: '', err: '', listeners: [], pcm: new Map(), loading: null };
+  /* ---------- AI 목소리 (Supertonic 3, 기기 안에서 계산) ----------
+     이 앱은 AI 목소리만 쓴다. 준비 전·실패 때는 소리 없이 예상 시간만큼 문장을 짚고 넘어간다.
+     테스트는 window.__SL_FAKE_TTS = { sampleRate, synth(text, opts) → Promise<Float32Array> } 를 넣어 모델 대신 쓴다 */
+  var model = { state: 'off', tts: null, msg: '', err: '', pct: 0, listeners: [], pcm: new Map(), loading: null };
   function modelEmit() { model.listeners.forEach(function (f) { try { f(model); } catch (e) { } }); }
   SL.model = model;
   SL.onModel = function (f) { model.listeners.push(f); return function () { model.listeners = model.listeners.filter(function (x) { return x !== f; }); }; };
   SL.loadModel = function () {
     if (model.loading) return model.loading;
-    model.state = 'loading'; model.msg = 'AI 목소리를 준비하는 중'; model.err = ''; modelEmit();
-    model.loading = import('./tts-client.js').then(function (m) { return m.createTTS(); }).then(function (tts) {
+    model.state = 'loading'; model.msg = 'AI 목소리를 준비하는 중'; model.err = ''; model.pct = 0; modelEmit();
+    var make = global.__SL_FAKE_TTS ? Promise.resolve({ load: function () { return Promise.resolve(); }, synth: function (t, o) { return global.__SL_FAKE_TTS.synth(t, o); }, sampleRate: global.__SL_FAKE_TTS.sampleRate || 16000 })
+      : import('./tts-client.js').then(function (m) { return m.createTTS(); });
+    model.loading = make.then(function (tts) {
       model.tts = tts;
-      return tts.load(function (msg) { model.msg = msg; modelEmit(); });
+      return tts.load(function (msg) {
+        model.msg = msg;
+        var m = /([\d.]+) \/ ([\d.]+) MB/.exec(msg), step = /\((\d)\/4\)/.exec(msg);
+        if (m && step) model.pct = Math.round(((+step[1] - 1) + (+m[1] / +m[2])) / 4 * 100);
+        else if (step) model.pct = Math.max(model.pct, Math.round(+step[1] / 4 * 100));
+        modelEmit();
+      });
     }).then(function () {
-      model.state = 'ready'; model.msg = 'AI 목소리 준비 완료'; modelEmit();
+      model.state = 'ready'; model.msg = 'AI 목소리 준비 완료'; model.pct = 100; modelEmit();
       return model.tts;
     }).catch(function (e) {
       model.state = 'error'; model.err = (e && e.message) || String(e); model.msg = 'AI 목소리를 준비하지 못했어요';
@@ -301,13 +221,14 @@
     if (model.pcm.has(key)) return model.pcm.get(key);
     var p = model.tts.synth(text, { voice: style, lang: 'ko', speed: 1.05 * (rate || 1), signal: signal }).catch(function (e) { model.pcm.delete(key); throw e; });
     model.pcm.set(key, p);
-    if (model.pcm.size > 24) model.pcm.delete(model.pcm.keys().next().value);
+    if (model.pcm.size > 40) model.pcm.delete(model.pcm.keys().next().value);
     return p;
   }
+  SL.synthPcm = function (text, opts) { return synthPcm(splitEmoji(text).text, opts.style, opts.rate); };
   /* 다음 문장을 미리 합성해 두어 문장 사이 틈을 줄인다 */
   SL.prefetch = function (text, opts) {
-    if (opts.voice !== 'ai' || model.state !== 'ready' || !text) return;
-    synthPcm(text, opts.style, opts.rate).catch(function () { });
+    if (model.state !== 'ready' || !text) return;
+    synthPcm(splitEmoji(text).text, opts.style, opts.rate).catch(function () { });
   };
   /* 소리 크기 맞추기: 목소리·문장마다 크기가 달라 들쭉날쭉하다 → 말소리 크기(RMS)를 같은 값으로 맞춘다.
      조용한 틈은 빼고 재며, 가장 큰 소리가 0.95 를 넘지 않게 하고, 너무 작은 소리를 지나치게 키우지 않는다(최대 6배) */
@@ -323,11 +244,28 @@
     return out;
   }
   SL.normalizePcm = normalize;
+  /* 테스트·진단용: 문장을 읽기 시작할 때 알린다 */
+  function announce(text, style, silent) { try { global.dispatchEvent(new CustomEvent('sl-say', { detail: { text: text, style: style, silent: !!silent } })); } catch (e) { } }
+
+  /* 소리 없이 예상 시간만큼 기다린다 (모델 준비 전·실패 때) */
+  function silentSay(text, opts, done) {
+    announce(text, opts.style, true);
+    var t = setTimeout(function () { done(true); }, expectMs(text, opts.rate));
+    return { cancel: function () { clearTimeout(t); } };
+  }
+  /* AI 목소리로 한 문장. 합성이 너무 오래 걸리면(예상 시간의 3배 + 5초) 소리 없이 넘어간다 */
   function modelSay(text, opts, done) {
-    var finished = false, src = null, timer = null, ac = typeof AbortController === 'function' ? new AbortController() : null;
+    var finished = false, src = null, timer = null, inner = null, ac = typeof AbortController === 'function' ? new AbortController() : null;
     function finish(ok) { if (finished) return; finished = true; clearTimeout(timer); done(ok); }
+    function fallback(why) {
+      if (finished || inner) return;
+      if (why) console.warn('[읽기] AI 목소리로 읽지 못해 소리 없이 넘어가요', why);
+      inner = silentSay(text, opts, finish);
+    }
+    timer = setTimeout(function () { if (ac) { try { ac.abort(); } catch (e) { } } fallback('합성이 너무 오래 걸림'); }, expectMs(text, opts.rate) * 3 + ms(5000));
     synthPcm(text, opts.style, opts.rate, ac && ac.signal).then(function (pcm) {
-      if (finished) return;
+      if (finished || inner) return;
+      clearTimeout(timer);
       var a = getAudio();
       if (!a) throw new Error('오디오를 쓸 수 없어요');
       if (a.state === 'suspended') { try { a.resume(); } catch (e) { } }
@@ -338,17 +276,15 @@
       src.buffer = buf;
       src.connect(a.destination);
       src.onended = function () { finish(true); };
+      announce(text, opts.style, false);
       src.start();
-      /* onended가 오지 않는 경우 대비: 소리 길이 + 1초 */
-      timer = setTimeout(function () { finish(true); }, ms(buf.duration * 1000 + 1000));
+      /* onended 가 오지 않는 경우 대비: 소리 길이 + 1초 */
+      timer = setTimeout(function () { finish(true); }, buf.duration * 1000 + ms(1000));
     }).catch(function (e) {
       if (finished) return;
       if (e && e.name === 'AbortError') return;
-      console.warn('[읽기] AI 목소리 합성 실패, 기기 목소리로 읽어요', e);
-      var h = deviceSay(text, opts.rate, finish, opts.pitch);
-      cancelInner = h.cancel;
+      fallback(e);
     });
-    var cancelInner = null;
     return {
       cancel: function () {
         if (finished) return;
@@ -356,20 +292,18 @@
         clearTimeout(timer);
         if (ac) { try { ac.abort(); } catch (e) { } }
         if (src) { try { src.onended = null; src.stop(); } catch (e) { } }
-        if (cancelInner) cancelInner();
+        if (inner) inner.cancel();
       }
     };
   }
 
   /* ---------- 말하기 창구 ----------
-     say(text, opts, done): opts = { rate, voice: 'device'|'ai', style }. 새로 말하면 앞의 것은 끊긴다.
+     say(text, opts, done): opts = { rate, style }. 새로 말하면 앞의 것은 끊긴다.
      done(true)는 끝까지 말했을 때 딱 한 번, 끊기면 부르지 않는다 */
   var current = null, token = 0;
   function stop() {
     token++;
     if (current) { var c = current; current = null; c.cancel(); }
-    var s = synth();
-    if (s) { try { if (s.speaking || s.pending) s.cancel(); } catch (e) { } }
   }
   function say(text, opts, done) {
     opts = opts || {};
@@ -384,7 +318,7 @@
       if (done) done(ok);
     };
     if (!spoken) { var t = setTimeout(function () { cb(true); }, ms(300)); current = { cancel: function () { clearTimeout(t); } }; return; }
-    current = (opts.voice === 'ai' && model.state === 'ready') ? modelSay(spoken, opts, cb) : deviceSay(spoken, opts.rate, cb, opts.pitch);
+    current = model.state === 'ready' ? modelSay(spoken, opts, cb) : silentSay(spoken, opts, cb);
   }
   SL.say = say;
 
@@ -401,9 +335,7 @@
     if (!out.length) out.push({ t: String(sentence), who: 'narr' });
     return { parts: out, at: n };
   };
-  /* 목소리 높낮이 (기기 목소리일 때 인물을 구분한다) */
-  SL.TONES = [['normal', '보통', 1], ['high', '높게', 1.3], ['higher', '아주 높게', 1.6], ['low', '낮게', 0.8], ['deep', '굵게', 0.6]];
   SL.STYLES = [['F1', '여자 1'], ['F2', '여자 2'], ['F3', '여자 3'], ['F4', '여자 4'], ['F5', '여자 5'], ['M1', '남자 1'], ['M2', '남자 2'], ['M3', '남자 3'], ['M4', '남자 4'], ['M5', '남자 5']];
-  SL.toneOf = function (id) { for (var i = 0; i < SL.TONES.length; i++) if (SL.TONES[i][0] === id) return SL.TONES[i][2]; return 1; };
+
   SL.stopSpeak = stop;
 })(window);

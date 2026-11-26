@@ -24,33 +24,22 @@ function waitServer() {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 
-/* 가짜 speechSynthesis. mode: normal(onend 옴) / silent(onend 안 옴, speaking=false) / stuck(onend 안 옴, 계속 speaking=true) / double(onend 두 번 + error) */
+/* 가짜 AI 목소리 모델. 이 앱은 AI 목소리만 쓴다.
+   mode: normal(짧은 소리를 바로 돌려줌) / fail(합성 실패) / hang(합성이 끝나지 않음) / none(모델 없음 = 목소리 준비 전)
+   읽기 시작마다 core.js 가 보내는 'sl-say' 를 받아 읽은 문장·짚은 문장·목소리를 적는다 */
 function fakeSpeech(mode) {
   return `(() => {
     window.__SL_TIME_SCALE = 0.02;
-    const log = window.__spoken = []; const marks = window.__marks = [];
-    let speaking = false;
-    const synth = {
-      get speaking() { return ${JSON.stringify(mode)} === 'stuck' ? speaking : speaking; },
-      pending: false, paused: false,
-      getVoices() { return [{ name: 'Fake Ko', lang: 'ko-KR', localService: true, default: true }]; },
-      addEventListener() {}, removeEventListener() {},
-      resume() {}, pause() {},
-      cancel() { speaking = false; },
-      speak(u) {
-        log.push(u.text); (window.__pitch = window.__pitch || []).push(u.pitch || 1);
-        const cur = document.querySelector('.s.cur');
-        marks.push(cur ? cur.textContent : null);
-        speaking = true;
-        const mode = ${JSON.stringify(mode)};
-        if (mode === 'normal') setTimeout(() => { speaking = false; u.onend && u.onend(); }, 15);
-        else if (mode === 'double') setTimeout(() => { speaking = false; u.onend && u.onend(); u.onend && u.onend(); u.onerror && u.onerror({ error: 'synthesis-failed' }); }, 15);
-        else if (mode === 'silent') setTimeout(() => { speaking = false; }, 10);
-        /* stuck: 계속 말하는 중으로 남는다 */
-      }
+    window.__spoken = []; window.__marks = []; window.__styles = []; window.__silent = [];
+    addEventListener('sl-say', (e) => {
+      window.__spoken.push(e.detail.text); window.__styles.push(e.detail.style); window.__silent.push(e.detail.silent);
+      const cur = document.querySelector('.s.cur'); window.__marks.push(cur ? cur.textContent : null);
+    });
+    const mode = ${JSON.stringify(mode)};
+    if (mode !== 'none') window.__SL_FAKE_TTS = {
+      sampleRate: 8000,
+      synth: (t) => mode === 'fail' ? Promise.reject(new Error('가짜 합성 실패')) : mode === 'hang' ? new Promise(() => {}) : Promise.resolve(new Float32Array(Math.max(80, t.length * 20)).map((_, i) => Math.sin(i / 3) * 0.2))
     };
-    Object.defineProperty(window, 'speechSynthesis', { value: synth, configurable: true });
-    window.SpeechSynthesisUtterance = function (t) { this.text = t; };
   })();`;
 }
 
@@ -92,7 +81,7 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
 (async () => {
   server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: ROOT, stdio: 'ignore' });
   await waitServer();
-  browser = await chromium.launch();
+  browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const allErrors = [];
   const track = (p) => allErrors.push(...p.errors.map((e) => `[${p.url()}] ${e}`));
 
@@ -305,33 +294,33 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     const norm = (x) => x.replace(/\s+/g, ' ').replace(/[.]$/, '').trim();
     r.spoken.forEach((s, i) => assert(i === 1 /* 표지: "지은이 ○○"를 "○○이 지은 이야기예요"로 읽는다 */ || (r.marks[i] && norm(r.marks[i]).indexOf(norm(s)) >= 0), `짚은 문장이 다름: ${r.marks[i]} / ${s}`));
   });
-  await test('읽어 주기: onend 가 오지 않는 엔진에서도 시간 대비로 넘어감', async () => {
-    const r = await readTest('silent');
+  await test('읽어 주기: 합성이 실패해도 소리 없이 짚으며 끝까지 넘어감', async () => {
+    const r = await readTest('fail');
     assert(JSON.stringify(r.spoken) === JSON.stringify(r.expect), '읽은 순서가 다름 ' + r.spoken.length + '/' + r.expect.length);
   });
-  await test('읽어 주기: 계속 말하는 중으로 남는 엔진도 최대 3배 뒤 넘어감', async () => {
-    const r = await readTest('stuck');
+  await test('읽어 주기: 합성이 끝나지 않아도 시간 대비로 넘어감', async () => {
+    const r = await readTest('hang');
     assert(JSON.stringify(r.spoken) === JSON.stringify(r.expect), '읽은 순서가 다름\n' + JSON.stringify(r.spoken) + '\n' + JSON.stringify(r.expect));
   });
-  await test('읽어 주기: 완료가 두 번 와도 한 번만 처리', async () => {
-    const r = await readTest('double');
+  await test('읽어 주기: AI 목소리 준비 전에도 문장을 짚으며 넘어감', async () => {
+    const r = await readTest('none');
     assert(JSON.stringify(r.spoken) === JSON.stringify(r.expect), '중복/누락 ' + r.spoken.length + '/' + r.expect.length);
   });
   await test('읽어 주기: 멈추기, 문장 터치, 쪽 넘기면 멈춤, 앱 숨기면 멈춤', async () => {
-    const { ctx, page } = await newPage({ speech: 'stuck' });
+    const { ctx, page } = await newPage({ speech: 'hang' });
     await page.goto(BASE);
     await makeBook(page, { preset: 'kid' });
     await page.waitForFunction(() => window.__spoken.length >= 1);
+    if ((await page.textContent('[data-act=play]')).indexOf('멈추기') < 0) await page.click('[data-act=play]');
     await page.click('[data-act=play]'); /* 멈추기 */
     const n1 = await page.evaluate(() => window.__spoken.length);
     await page.waitForTimeout(400);
     assert((await page.evaluate(() => window.__spoken.length)) === n1, '멈췄는데 계속 읽음');
     assert((await page.$$('.s.cur')).length === 0, '멈췄는데 노란 표시가 남음');
     await page.click('[data-act=next]');
+    const first = (await page.textContent('.txt .s >> nth=0')).trim();
     await page.click('.txt .s >> nth=0');
-    const last = await page.evaluate(() => window.__spoken[window.__spoken.length - 1]);
-    const first = await page.textContent('.txt .s >> nth=0');
-    assert(last === first.trim(), '터치한 문장을 읽지 않음');
+    await page.waitForFunction((f) => window.__spoken.indexOf(f) >= 0 || window.__spoken.some((x) => f.indexOf(x) >= 0), first, { timeout: 5000 });
     await page.click('[data-act=play]');
     await page.waitForTimeout(50);
     await page.click('[data-act=next]');
@@ -434,7 +423,7 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     track(page); await ctx.close();
   });
 
-  await test('목소리: 해설과 대사를 나눠 읽고, 인물마다 정한 목소리(높낮이)로 읽음', async () => {
+  await test('목소리: 해설과 대사를 나눠 읽고, 인물마다 정한 AI 목소리로 읽음', async () => {
     const { ctx, page } = await newPage();
     await page.goto(BASE);
     await makeBook(page, { preset: 'baby', world: 'adv' });
@@ -444,25 +433,27 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     assert(await page.$('[data-role=narr]') && await page.$('[data-role=hero]'), '해설·주인공 목소리 칸이 없음');
     const friendRole = await page.$$eval('[data-role^="f:"]', (a) => a.map((x) => x.getAttribute('data-role')));
     assert(friendRole.length === 1, '친구 목소리 칸 수 ' + friendRole.length);
-    await page.click('[data-role=hero] [data-tone=deep]');
-    await page.click(`[data-role="${friendRole[0]}"] [data-tone=higher]`);
+    await page.click('[data-role=hero] [data-ai-style=M5]');
+    await page.click(`[data-role="${friendRole[0]}"] [data-ai-style=F4]`);
+    await page.click('[data-role=narr] [data-ai-style=M1]');
     await page.click('[data-act=deco-save]');
-    await page.evaluate(() => { window.__spoken.length = 0; window.__pitch = []; });
+    await page.evaluate(() => { window.__spoken.length = 0; window.__styles.length = 0; window.__silent.length = 0; });
     await page.click('[data-act=play]');
     await page.waitForFunction(() => document.querySelector('[data-pno]').textContent === '끝', null, { timeout: 30000 });
-    const r = await page.evaluate(() => ({ s: window.__spoken.slice(), p: window.__pitch.slice() }));
+    const r = await page.evaluate(() => ({ s: window.__spoken.slice(), v: window.__styles.slice(), q: window.__silent.slice() }));
+    assert(r.q.every((x) => x === false), 'AI 목소리로 읽지 않은 문장이 있음');
     const iHero = r.s.findIndex((x) => x === '좋아, 출발!');
-    assert(iHero >= 0 && r.p[iHero] === 0.6, '주인공 대사 높낮이 ' + r.p[iHero]);
+    assert(iHero >= 0 && r.v[iHero] === 'M5', '주인공 대사 목소리 ' + r.v[iHero]);
     const iNarr = r.s.findIndex((x) => x.indexOf('살았어요') >= 0);
-    assert(iNarr >= 0 && r.p[iNarr] === 1, '해설 높낮이 ' + r.p[iNarr]);
-    assert(r.p.indexOf(1.6) >= 0, '친구 대사를 친구 목소리로 읽지 않음');
+    assert(iNarr >= 0 && r.v[iNarr] === 'M1', '해설 목소리 ' + r.v[iNarr]);
+    assert(r.v.indexOf('F4') >= 0, '친구 대사를 친구 목소리로 읽지 않음');
     track(page); await ctx.close();
   });
 
   /* 4. 반응형 */
   const SIZES = [[320, 568], [360, 640], [390, 844], [412, 360], [640, 320], [768, 1024], [1024, 768], [1180, 820], [1366, 768], [1920, 1080]];
   await test('반응형: ' + SIZES.map((s) => s.join('×')).join(', ') + ' 모든 화면', async () => {
-    const { ctx, page } = await newPage({ speech: 'silent' });
+    const { ctx, page } = await newPage({ speech: 'none' });
     await page.goto(BASE);
     await makeBook(page, { preset: 'big', world: 'sea', name: '바다별이콩콩콩' });
     await page.click('[data-act=play]');

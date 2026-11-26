@@ -452,3 +452,15 @@ input { font: inherit; }
   .scr-shelf .bookcase { --bw: 216px; --rh: 290px; }
   .scr-shelf .wrap.home { grid-template-columns: minmax(360px, 420px) 1fr; }
 }
+
+
+/* ---------- AI 목소리 준비 칸 ---------- */
+.voice-panel { display: grid; gap: 8px; background: var(--paper); border: 1px solid var(--paper-line); border-radius: 16px; padding: 12px 14px; }
+.voice-panel[data-state="ready"] { background: #eef7ec; border-color: #cfe5c9; }
+.voice-panel .vp-t { font-size: 17px; font-weight: 800; word-break: keep-all; }
+.voice-panel .vp-s { font-size: 15px; color: var(--sub); line-height: 1.5; word-break: keep-all; }
+.voice-panel .vp-bar { height: 10px; border-radius: 6px; background: #eadfca; overflow: hidden; }
+.voice-panel .vp-bar i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+.scr-read .badge { min-height: 48px; padding: 0 8px; border-radius: 12px; background: transparent; font-size: 14px; color: var(--sub); white-space: nowrap; }
+.scr-read .badge.off { color: #b4451c; text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 420px) { .scr-read .badge { font-size: 0; width: 48px; min-width: 48px; flex: none; } .scr-read .badge::before { content: "🎙️"; font-size: 20px; } .scr-read .badge.off::before { content: "🔇"; } }

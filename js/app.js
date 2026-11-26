@@ -26,6 +26,7 @@
   function btn(text, cls, on, attrs) { attrs = attrs || {}; attrs.class = 'btn ' + (cls || ''); attrs.type = 'button'; attrs.text = text; attrs.onclick = on; return h('button', attrs); }
   function screen(name, kids) {
     if (leaveRead) { var f = leaveRead; leaveRead = null; f(); }
+    screenOffs.splice(0).forEach(function (off) { try { off(); } catch (e) { } });
     SL.stopSpeak();
     closeModal();
     app.textContent = '';
@@ -34,7 +35,9 @@
     if (pendingReload && name !== 'read') { location.reload(); }
     return s;
   }
-  function speakOpts() { return { rate: data.rate, voice: data.voice, style: data.style }; }
+  function speakOpts() { return { rate: data.rate, style: data.style }; }
+  /* 화면을 바꿀 때 풀어 줄 구독 (AI 목소리 상태 등) */
+  var screenOffs = [];
   function speak(text) { SL.say(text, speakOpts()); }
   var toastTimer = null;
   function toast(msg, ms) {
@@ -114,6 +117,7 @@
             h('span', { class: 'sl' }, [x[1], i === 3 && data.books.length ? h('small', { text: '최근 책 열기' }) : null]), h('span', { class: 'go', text: '›', 'aria-hidden': 'true' })
           ])]);
         })),
+        data.aiReady && SL.model.state === 'ready' ? null : voicePanel(false),
         tipBox()
       ])
     ]);
@@ -350,7 +354,7 @@
 
   /* ---------- 등장인물 목소리 ----------
      읽어 주는 사람(해설): 대사를 뺀 글 전부. 따옴표 대사는 그 대사를 말한 인물의 목소리로 읽는다.
-     기기 목소리는 높낮이(pitch)로, AI 목소리는 목소리 10가지 중 하나로 구분한다. 책마다 저장한다 */
+     AI 목소리 10가지 중 하나로 구분한다. 책마다 저장한다 */
   function rolesOf(book) {
     var roles = [{ key: 'narr', e: '📖', n: '읽어 주는 사람' }], sw = book.swap || {};
     var swe = function (e) { return sw[e] || e; };
@@ -362,22 +366,23 @@
     } catch (e) { /* 예전 책: 해설만 */ }
     return roles;
   }
+  /* 처음 목소리: 해설은 기본 목소리, 주인공·친구·말썽꾼은 서로 다른 목소리를 나눠 준다 */
   function defaultVoices(book) {
-    var d = {}, tones = ['higher', 'low', 'high', 'normal'], ais = ['F3', 'M2', 'F4', 'M4', 'F5', 'M5'], fi = 0;
+    var d = {}, ais = ['F3', 'M2', 'F4', 'M4', 'F5', 'M5'], fi = 0;
     var narrAi = data.style || 'F1';
     var pickAi = function (want) { return want === narrAi ? (want === 'F1' ? 'F5' : 'F1') : want; };
     rolesOf(book).forEach(function (r) {
-      if (r.key === 'narr') d.narr = { tone: 'normal', ai: narrAi };
-      else if (r.key === 'hero') d.hero = { tone: 'high', ai: pickAi('F2') };
-      else if (r.key === 'v') d.v = { tone: 'deep', ai: pickAi('M3') };
-      else { d[r.key] = { tone: tones[fi % tones.length], ai: pickAi(ais[fi % ais.length]) }; fi++; }
+      if (r.key === 'narr') d.narr = { ai: narrAi };
+      else if (r.key === 'hero') d.hero = { ai: pickAi('F2') };
+      else if (r.key === 'v') d.v = { ai: pickAi('M3') };
+      else { d[r.key] = { ai: pickAi(ais[fi % ais.length]) }; fi++; }
     });
     return d;
   }
   function voiceOf(book, who) {
     var def = defaultVoices(book), mine = book.voices || {};
-    var v = mine[who] || def[who] || mine.narr || def.narr || { tone: 'normal', ai: data.style };
-    return { rate: data.rate, voice: data.voice, style: v.ai || data.style, pitch: SL.toneOf(v.tone) };
+    var v = mine[who] || def[who] || mine.narr || def.narr || { ai: data.style };
+    return { rate: data.rate, style: v.ai || data.style };
   }
   /* 문장 하나를 해설·대사로 나눠 차례로 읽는다. done 은 끝까지 읽었을 때 한 번 */
   function sayLine(book, sentence, who, at, done, isLive) {
@@ -402,7 +407,7 @@
     var stage = h('div', { class: 'stage' });
     var pno = h('div', { class: 'pno', 'data-pno': '' });
     var playBtn = btn('🔊 읽어 주기', 'primary', function () { if (playing) stopPlay(); else startPlay(); }, { 'data-act': 'play' });
-    var badge = h('span', { class: 'badge', 'data-ai': '' });
+    var badge = h('button', { type: 'button', class: 'badge', 'data-ai': '', onclick: function () { if (SL.model.state !== 'ready') { stopPlay(); settings(); } } });
     var prevB = btn('◀', 'icon white', function () { go(idx - 1); }, { 'aria-label': '앞 쪽', 'data-act': 'prev' });
     var nextB = btn('▶', 'icon white', function () { go(idx + 1); }, { 'aria-label': '다음 쪽', 'data-act': 'next' });
 
@@ -530,7 +535,11 @@
       else if (e.key === 'Escape') { e.preventDefault(); shelf(); }
     }
     function onVis() { if (document.hidden) stopPlay(); }
-    function updBadge() { badge.textContent = data.voice === 'ai' && SL.model.state === 'ready' ? '🤖 AI 목소리' : data.voice === 'ai' && SL.model.state === 'loading' ? '🤖 준비 중…' : ''; }
+    function updBadge() {
+      var st = SL.model.state;
+      badge.textContent = st === 'ready' ? '🎙️ AI 목소리' : st === 'loading' ? '🎙️ 준비 중 ' + (SL.model.pct || 0) + '%' : '🔇 목소리 준비 전';
+      badge.classList.toggle('off', st !== 'ready');
+    }
     var offModel = SL.onModel(updBadge);
 
     screen('read', [
@@ -673,13 +682,12 @@
           ])
         ]));
       } else {
-        var ai = data.voice === 'ai';
-        box.appendChild(h('p', { class: 'note-box', text: ai ? '🤖 AI 목소리 10가지 중에서 골라요. 읽어 주는 사람은 대사를 뺀 글을 읽어요.' : '📱 기기 목소리는 높낮이로 인물을 구분해요. AI 목소리는 ⚙️ 설정에서 켤 수 있어요.' }));
+        box.appendChild(h('p', { class: 'note-box', text: '🎙️ AI 목소리 10가지 중에서 골라요. 읽어 주는 사람은 대사를 뺀 글을 읽고, 따옴표 대사는 그 인물의 목소리로 읽어요.' }));
+        if (SL.model.state !== 'ready') box.appendChild(voicePanel(true));
         var list = h('div', { class: 'roles' });
         rolesOf(book).forEach(function (r) {
-          var v = voices[r.key] || (voices[r.key] = { tone: 'normal', ai: data.style });
-          var choices = ai ? SL.STYLES.map(function (x) { return btn(x[1], v.ai === x[0] ? 'on' : '', function () { v.ai = x[0]; draw(); }, { 'data-vk': r.key, 'data-ai-style': x[0] }); })
-            : SL.TONES.map(function (x) { return btn(x[1], v.tone === x[0] ? 'on' : '', function () { v.tone = x[0]; draw(); }, { 'data-vk': r.key, 'data-tone': x[0] }); });
+          var v = voices[r.key] || (voices[r.key] = { ai: data.style });
+          var choices = SL.STYLES.map(function (x) { return btn(x[1], v.ai === x[0] ? 'on' : '', function () { v.ai = x[0]; draw(); }, { 'data-vk': r.key, 'data-ai-style': x[0] }); });
           list.appendChild(h('div', { class: 'role', 'data-role': r.key }, [
             h('div', { class: 'who' }, [h('span', { class: 'rem', text: r.e }), h('b', { text: r.n }),
               btn('▶ 들어 보기', 'white', function () { var tmp = book.voices; book.voices = voices; SL.say(sample(r), voiceOf(book, r.key)); book.voices = tmp; }, { 'data-listen': r.key })]),
@@ -705,46 +713,68 @@
   }
 
   /* ---------- 설정 ---------- */
-  function settings() {
-    var box;
-    var status = h('div', { class: 'status', 'data-model-status': '' });
-    var off = SL.onModel(function (m) { status.textContent = m.state === 'error' ? m.msg + ' (' + m.err.slice(0, 120) + ')' : m.msg; });
+  /* AI 목소리 준비 칸: 상태·진행률·준비 단추 (책장 작업대, 설정, 읽기 화면에서 같이 쓴다) */
+  function voicePanel(compact) {
+    var box = h('div', { class: 'voice-panel' + (compact ? ' compact' : ''), 'data-voice-panel': '' });
     function draw() {
+      var m = SL.model;
+      box.textContent = '';
+      box.dataset.state = m.state;
+      if (m.state === 'ready') {
+        box.appendChild(h('div', { class: 'vp-t', text: '🎙️ AI 목소리 준비 완료' }));
+        if (!compact) box.appendChild(h('div', { class: 'vp-s', text: '이 기기 안에서 읽어요. 인터넷이 없어도 돼요.' }));
+        return;
+      }
+      if (m.state === 'loading') {
+        box.appendChild(h('div', { class: 'vp-t', text: '🎙️ AI 목소리 준비 중… ' + (m.pct || 0) + '%' }));
+        box.appendChild(h('div', { class: 'vp-bar', role: 'progressbar', 'aria-valuenow': String(m.pct || 0), 'aria-valuemin': '0', 'aria-valuemax': '100' }, [h('i', { style: 'width:' + (m.pct || 0) + '%' })]));
+        if (!compact) box.appendChild(h('div', { class: 'vp-s', text: m.msg }));
+        return;
+      }
+      box.appendChild(h('div', { class: 'vp-t', text: m.state === 'error' ? '🎙️ AI 목소리를 준비하지 못했어요' : '🎙️ 읽어 주려면 AI 목소리가 필요해요' }));
+      if (!compact) box.appendChild(h('div', { class: 'vp-s', text: m.state === 'error' ? '인터넷 연결을 확인하고 다시 눌러 주세요.' : '처음 한 번 약 180MB를 내려받아요 (Wi-Fi 권장). 그 뒤에는 인터넷 없이 읽어요.' }));
+      box.appendChild(btn(m.state === 'error' ? '↻ 다시 준비하기' : '🎙️ AI 목소리 준비하기', 'primary block', function () { prepareVoice(); }, { 'data-act': 'prepare-voice' }));
+    }
+    var off = SL.onModel(draw);
+    draw();
+    box._off = off;
+    screenOffs.push(off);
+    return box;
+  }
+  function prepareVoice() {
+    return SL.loadModel().then(function () {
+      if (!data.aiReady) { data.aiReady = true; persist(); }
+      speak('안녕! 그림책 공방이에요. 이제 이야기를 읽어 줄게요.');
+    }).catch(function (e) { console.warn('AI 목소리 준비 실패', e); });
+  }
+
+  function settings() {
+    var box, panel;
+    function draw() {
+      if (panel && panel._off) panel._off();
       box.textContent = '';
       box.appendChild(h('h2', { text: '⚙️ 설정' }));
+      box.appendChild(h('h3', { text: 'AI 목소리' }));
+      panel = voicePanel(false);
+      box.appendChild(panel);
+      box.appendChild(h('h3', { text: '읽어 주는 사람의 기본 목소리' }));
+      box.appendChild(h('div', { class: 'row' }, SL.STYLES.map(function (x) {
+        return btn(x[1], data.style === x[0] ? 'on' : '', function () { data.style = x[0]; persist(); draw(); speak('안녕! 이 목소리로 읽어 줄게요.'); }, { 'data-style': x[0] });
+      })));
+      box.appendChild(h('p', { class: 'small', text: '등장인물 목소리는 읽기 화면의 🎨 꾸미기 → 🎭 목소리에서 책마다 정해요.' }));
       box.appendChild(h('h3', { text: '읽는 빠르기' }));
       box.appendChild(h('div', { class: 'row' }, [[0.8, '🐢 느리게'], [1, '🙂 보통'], [1.2, '🐇 빠르게']].map(function (r) {
         return btn(r[1], data.rate === r[0] ? 'on' : '', function () { data.rate = r[0]; persist(); draw(); speak('이 빠르기로 읽어 줄게요.'); }, { 'data-rate': String(r[0]) });
       })));
-      box.appendChild(h('h3', { text: '목소리' }));
-      box.appendChild(h('div', { class: 'row' }, [
-        btn('📱 기기 목소리', data.voice === 'device' ? 'on' : '', function () { data.voice = 'device'; persist(); draw(); }, { 'data-voice': 'device' }),
-        btn('🤖 AI 목소리', data.voice === 'ai' ? 'on' : '', function () {
-          data.voice = 'ai'; persist(); draw();
-          SL.loadModel().then(function () { speak('안녕! 그림책 공방이에요.'); }).catch(function () { });
-        }, { 'data-voice': 'ai' })
-      ]));
-      var vi = SL.voiceInfo();
-      if (data.voice === 'device') {
-        box.appendChild(h('p', { class: 'small', text: vi.local ? '이 기기 안의 한국어 목소리로 읽어요. (' + vi.picked + ')' : vi.ko ? '기기 안 한국어 목소리가 없어 인터넷 목소리를 써요. 기기 설정에서 한국어 음성을 내려받으면 인터넷 없이 읽을 수 있어요.' : '한국어 목소리를 찾지 못했어요. 기기 설정에서 한국어 음성을 설치해 주세요. 설치 전에는 글자만 짚어 줘요.' }));
-      } else {
-        box.appendChild(h('p', { class: 'small', text: 'AI 목소리는 컴퓨터가 만든 목소리예요. 처음 한 번 약 180MB를 내려받고(Wi-Fi 권장), 그 뒤에는 인터넷 없이 이 기기 안에서 읽어요.' }));
-        box.appendChild(status);
-        var names = { F1: '여자 1', F2: '여자 2', F3: '여자 3', F4: '여자 4', F5: '여자 5', M1: '남자 1', M2: '남자 2', M3: '남자 3', M4: '남자 4', M5: '남자 5' };
-        box.appendChild(h('div', { class: 'row' }, Object.keys(names).map(function (k) {
-          return btn(names[k], data.style === k ? 'on' : '', function () { data.style = k; persist(); draw(); if (SL.model.state === 'ready') speak('안녕! 이 목소리로 읽어 줄게요.'); }, { 'data-style': k });
-        })));
-        if (SL.model.state === 'off' || SL.model.state === 'error') SL.loadModel().catch(function () { });
-      }
       box.appendChild(btn('🔊 미리 듣기', '', function () { speak('옛날 옛적, 작은 마을에 토끼가 살았어요.'); }));
       box.appendChild(h('h3', { text: '알아 두세요' }));
+      box.appendChild(h('p', { class: 'small', text: 'AI 목소리는 컴퓨터가 만든 목소리예요.' }));
       box.appendChild(h('p', { class: 'small', text: '만든 책은 이 기기의 브라우저 안에만 저장돼요. 브라우저 기록을 지우면 책도 지워져요.' }));
       box.appendChild(h('p', { class: 'small', text: '그림은 이모지로 그려서 기기(아이패드·안드로이드·윈도우)마다 조금씩 다르게 보여요.' }));
       box.appendChild(h('p', { class: 'small' }, ['AI 목소리: Supertonic 3 (Supertone Inc., ', h('a', { href: 'licenses/OpenRAIL-M.txt', target: '_blank', rel: 'noopener', text: 'OpenRAIL-M' }), ') · 음성 엔진: ONNX Runtime Web (', h('a', { href: 'licenses/onnxruntime-MIT.txt', target: '_blank', rel: 'noopener', text: 'MIT' }), ')']));
-      box.appendChild(h('div', { class: 'row' }, [btn('닫기', 'primary', function () { closeModal(); off(); }, { 'data-act': 'close-settings' })]));
-      status.textContent = SL.model.state === 'error' ? SL.model.msg + ' (' + SL.model.err.slice(0, 120) + ')' : SL.model.msg;
+      box.appendChild(h('div', { class: 'row' }, [btn('닫기', 'primary', function () { closeModal(); if (panel._off) panel._off(); }, { 'data-act': 'close-settings' })]));
     }
-    box = modal([], off);
+    box = modal([], function () { if (panel && panel._off) panel._off(); });
     draw();
   }
 
@@ -758,7 +788,8 @@
     fitVV();
   }
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () { }); } catch (e) { }
-  if (data.voice === 'ai') SL.loadModel().catch(function () { });
+  /* 한 번 받아 둔 AI 목소리는 앱을 열 때 바로 불러온다 (캐시에서, 인터넷 없이) */
+  if (data.aiReady || window.__SL_FAKE_TTS) SL.loadModel().catch(function () { });
 
   /* 오프라인 캐시. 새 버전이 오면 읽는 중이 아닐 때만 새로 고친다 */
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
