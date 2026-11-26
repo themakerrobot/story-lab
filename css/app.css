@@ -137,37 +137,37 @@ input { font: inherit; }
 @keyframes twinkle { 0%, 100% { opacity: .2; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.1); } }
 
 /* 읽기 */
-.read .stage { flex: 1; min-height: 0; container-type: size; container-name: stage; }
-.read .pg { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 4px 16px; }
-.read .pg > .scene { width: min(100%, calc(58cqh * 4 / 3)); }
-.read .txt {
+.scr-read .stage { flex: 1; min-height: 0; container-type: size; container-name: stage; overflow: hidden; }
+.scr-read .pg { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 4px 16px; }
+.scr-read .pg > .scene { width: min(100%, calc(58cqh * 4 / 3)); }
+.scr-read .txt {
   flex: 1; min-height: 0; width: min(100%, 760px); overflow-y: auto; overflow-x: hidden;
   font-size: 24px; line-height: 1.75; word-break: keep-all; overflow-wrap: anywhere; padding: 2px 4px 8px;
 }
-.read .txt .s { cursor: pointer; border-radius: 8px; transition: background .15s; padding: 1px 2px; }
-.read .txt .s.cur { background: var(--hl); box-shadow: 0 0 0 3px var(--hl); }
+.scr-read .txt .s { cursor: pointer; border-radius: 8px; transition: background .15s; padding: 1px 2px; }
+.scr-read .txt .s.cur { background: var(--hl); box-shadow: 0 0 0 3px var(--hl); }
 .w-link { color: #1f63c6; font-weight: 800; }
 .w-mime { text-decoration: underline wavy #ff8a3d; text-decoration-thickness: 2px; text-underline-offset: 6px; }
-.read .cover-t { font-size: 30px; font-weight: 900; text-align: center; line-height: 1.35; overflow-wrap: anywhere; }
-.read .cover-a { font-size: 20px; color: var(--sub); text-align: center; margin-top: 6px; overflow-wrap: anywhere; }
-.read .the-end { font-size: 54px; font-weight: 900; text-align: center; margin: 4px 0 10px; letter-spacing: .2em; }
-.read .end-btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-.read .legend { font-size: 15px; color: var(--sub); text-align: center; margin-top: 12px; line-height: 1.6; }
-.read .pno { min-width: 92px; text-align: center; font-weight: 900; font-size: 20px; }
-.read .badge { font-size: 14px; color: var(--sub); white-space: nowrap; }
-.read .flip-next { animation: flipN .24s ease-out; }
-.read .flip-prev { animation: flipP .24s ease-out; }
+.scr-read .cover-t { font-size: 30px; font-weight: 900; text-align: center; line-height: 1.35; overflow-wrap: anywhere; }
+.scr-read .cover-a { font-size: 20px; color: var(--sub); text-align: center; margin-top: 6px; overflow-wrap: anywhere; }
+.scr-read .the-end { font-size: 54px; font-weight: 900; text-align: center; margin: 4px 0 10px; letter-spacing: .2em; }
+.scr-read .end-btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.scr-read .legend { font-size: 15px; color: var(--sub); text-align: center; margin-top: 12px; line-height: 1.6; }
+.scr-read .pno { min-width: 92px; text-align: center; font-weight: 900; font-size: 20px; }
+.scr-read .badge { font-size: 14px; color: var(--sub); white-space: nowrap; }
+.scr-read .flip-next { animation: flipN .24s ease-out; }
+.scr-read .flip-prev { animation: flipP .24s ease-out; }
 @keyframes flipN { from { opacity: .2; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 @keyframes flipP { from { opacity: .2; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
 /* 가로로 넓고 낮은 화면: 장면은 왼쪽, 글은 오른쪽. 장면은 남은 높이와 폭 중 작은 쪽에 맞춘다 */
 @container stage (min-aspect-ratio: 5 / 4) {
-  .read .pg { flex-direction: row; align-items: center; }
-  .read .pg > .scene { width: min(56%, calc(100cqh * 4 / 3 - 12px)); }
-  .read .txt { height: 100%; display: flex; flex-direction: column; justify-content: safe center; }
+  .scr-read .pg { flex-direction: row; align-items: center; }
+  .scr-read .pg > .scene { width: min(56%, calc(100cqh * 4 / 3 - 12px)); }
+  .scr-read .txt { height: 100%; display: flex; flex-direction: column; justify-content: safe center; }
 }
 @media (max-height: 420px) {
   :root { --top: 52px; --bottom: 60px; }
-  .read .txt { font-size: 22px; line-height: 1.6; }
+  .scr-read .txt { font-size: 22px; line-height: 1.6; }
   .bar.bottom { padding-bottom: 4px; }
 }
 
@@ -184,5 +184,43 @@ input { font: inherit; }
 .toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); translate: -50% 0; background: #3a2c22; color: #fff; padding: 12px 18px; border-radius: 14px; font-size: 17px; z-index: 60; max-width: calc(100% - 32px); text-align: center; word-break: keep-all; }
 
 @media (prefers-reduced-motion: reduce) {
-  .scene .ch, .scene .ob, .scene .sp, .read .flip-next, .read .flip-prev { animation: none !important; }
+  .scene .ch, .scene .ob, .scene .sp, .scr-read .flip-next, .scr-read .flip-prev { animation: none !important; }
 }
+
+/* PC·큰 화면: 휴대폰 크기 그대로면 글씨와 카드가 작아 보인다 → 화면 크기에 맞춰 키우고, 내용 폭을 가운데로 모은다 */
+@media (min-width: 1200px) and (min-height: 760px) {
+  :root { --top: 76px; --bottom: 92px; }
+  .scroll > * { max-width: 1280px; margin-left: auto; margin-right: auto; }
+  .btn { font-size: clamp(20px, 1.25vw, 28px); min-height: clamp(48px, 3.4vw, 64px); }
+  .btn.icon { width: clamp(48px, 3.4vw, 64px); font-size: clamp(24px, 1.6vw, 32px); }
+  .btn.big { min-height: clamp(64px, 4.4vw, 84px); font-size: clamp(24px, 1.6vw, 32px); }
+  .title { font-size: clamp(24px, 1.7vw, 34px); }
+  .prompt { font-size: clamp(24px, 2.1vw, 40px); margin-bottom: 20px; }
+  .hint, .stat { font-size: clamp(16px, 1.05vw, 22px); }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(clamp(132px, 11vw, 220px), 1fr)); gap: clamp(12px, 1vw, 20px); }
+  .card { min-height: clamp(112px, 9vw, 180px); border-radius: 24px; }
+  .card .ce { font-size: clamp(46px, 4.2vw, 84px); }
+  .card .cn { font-size: clamp(18px, 1.3vw, 28px); }
+  .card .cd { font-size: clamp(14px, .95vw, 20px); }
+  .dot { width: clamp(22px, 1.7vw, 32px); height: clamp(22px, 1.7vw, 32px); font-size: clamp(13px, 1vw, 20px); }
+  .chip { font-size: clamp(16px, 1.1vw, 22px); min-height: clamp(32px, 2.2vw, 42px); padding: 4px 16px; }
+  .shelf { grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 14vw, 280px), 1fr)); }
+  .bookcard .bt { font-size: clamp(18px, 1.2vw, 26px); }
+  .bookcard .ba { font-size: clamp(15px, .95vw, 20px); }
+  .finish label, .row .lab { font-size: clamp(19px, 1.3vw, 26px); }
+  .finish input { font-size: clamp(22px, 1.5vw, 30px); min-height: clamp(52px, 3.8vw, 72px); }
+  .presets, .custom, .finish { max-width: 960px; }
+  .coverbox { width: min(100%, 560px); }
+  .covertext .ct { font-size: clamp(26px, 2vw, 40px); }
+  .scr-read .pg { gap: clamp(12px, 2vw, 40px); padding: 4px clamp(16px, 3vw, 64px); }
+  .scr-read .txt { font-size: clamp(24px, 1.15vw + 1.4vh, 42px); line-height: 1.75; width: min(100%, 900px); }
+  .scr-read .cover-t { font-size: clamp(30px, 2.6vw, 56px); }
+  .scr-read .cover-a { font-size: clamp(20px, 1.5vw, 32px); }
+  .scr-read .the-end { font-size: clamp(54px, 5vw, 110px); }
+  .scr-read .pno { font-size: clamp(20px, 1.4vw, 30px); min-width: 120px; }
+  .scr-read .legend { font-size: clamp(15px, 1vw, 20px); }
+  .modal { width: min(100%, 680px); }
+  .modal p { font-size: clamp(17px, 1.1vw, 22px); }
+}
+.scr-read .read-t { font-size: 19px; }
+@media (min-width: 1200px) and (min-height: 760px) { .scr-read .read-t { font-size: clamp(19px, 1.3vw, 28px); } }

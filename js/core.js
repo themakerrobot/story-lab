@@ -234,8 +234,9 @@
       if (busy && Date.now() - t0 < expect * 3) timers.push(setTimeout(check, ms(400)));
       else finish(true);
     }
-    timers.push(setTimeout(check, expect));
-    if (!s || !global.SpeechSynthesisUtterance) return { cancel: function () { finish(false); } };
+    /* 대비 타이머는 실제로 말하기 시작한 때부터 잰다 (안드로이드에서 80ms 늦게 말하는 사이에 끝난 것으로 보지 않게) */
+    function arm() { t0 = Date.now(); timers.push(setTimeout(check, expect)); }
+    if (!s || !global.SpeechSynthesisUtterance) { arm(); return { cancel: function () { finish(false); } }; }
     var u;
     try {
       u = new global.SpeechSynthesisUtterance(String(text));
@@ -245,9 +246,10 @@
       if (v) u.voice = v;
       u.onend = function () { finish(true); };
       u.onerror = function (e) { if (e && (e.error === 'interrupted' || e.error === 'canceled')) return; finish(true); };
-    } catch (e) { return { cancel: function () { finish(false); } }; }
+    } catch (e) { arm(); return { cancel: function () { finish(false); } }; }
     var go = function () {
       if (finished) return;
+      arm();
       try { s.resume(); } catch (e) { }
       lastUtter = u; /* 말하는 도중 가비지 수거로 끊기지 않게 잡아 둔다 */
       try { s.speak(u); } catch (e) { }

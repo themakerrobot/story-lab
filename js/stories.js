@@ -252,7 +252,7 @@
       launch: '{H:은/는} 반짝이는 모래시계를 뒤집었어요. 빙글빙글… 눈을 떠 보니 아주 먼 옛날 공룡 시대였어요!', launchBg: 'jungle',
       places: ['jungle', 'volcano', 'dbeach', 'rockhill', 'nest'],
       friends: ['brachio', 'ptero', 'turtle', 'monkey', 'bird'],
-      villains: ['trex', 'croc'],
+      villains: ['trex', 'croc', 'wolf'],
       helpers: ['지나가던 엄마 공룡', '친절한 목이 긴 공룡', '하늘을 나는 공룡'],
       goals: [
         { id: 'egg', e: '🥚', n: '공룡 알 돌려주기', t: '{H:은/는} 길에서 주운 공룡 알을 엄마 공룡에게 돌려주고 싶었어요.', done: '공룡 알을 엄마 공룡에게 돌려주었어요', miss: '엄마 공룡은 아직 찾지 못했어요.' },

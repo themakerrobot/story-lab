@@ -29,7 +29,7 @@
     SL.stopSpeak();
     closeModal();
     app.textContent = '';
-    var s = h('div', { class: 'screen ' + name, 'data-screen': name }, kids);
+    var s = h('div', { class: 'screen scr-' + name, 'data-screen': name }, kids);
     app.appendChild(s);
     if (pendingReload && name !== 'read') { location.reload(); }
     return s;
@@ -185,7 +185,8 @@
     });
     function choose(c) {
       book.picks[step.key] = c.id;
-      if (i + 1 < steps.length) pick(book, i + 1);
+      if (step.kind === 'hero') nameScreen(book, c, i + 1);
+      else if (i + 1 < steps.length) pick(book, i + 1);
       else finish(book);
     }
     var g = h('div', { class: 'grid', 'data-step': step.key });
@@ -207,6 +208,35 @@
       h('div', { class: 'bar bottom' }, [btn('🎲 골라 줘', 'blue', function () { choose(SL.pick(opts)); }, { 'data-act': 'random' })])
     ]);
     speak(q);
+  }
+
+  /* ---------- 주인공 이름 짓기 (주인공을 고른 바로 다음) ----------
+     이름을 지으면 뒤의 질문·문장·읽어 주기가 모두 그 이름으로 나온다. 안 지어도 된다 */
+  function nameScreen(book, hero, next) {
+    var input = h('input', { id: 'f-hero-name', type: 'text', maxlength: '8', value: book.name || '', placeholder: '예) 콩이', autocomplete: 'off', enterkeyhint: 'done' });
+    var preview = h('div', { class: 'hint', 'data-name-preview': '' });
+    function upd() {
+      var n = SL.cleanInput(input.value, 8);
+      preview.textContent = n ? '"' + SL.J(hero.n + ' ' + n, '이/가') + ' 살았어요."' : '이름이 없으면 "' + hero.n + '"(이)라고 불러요.';
+    }
+    function go(useName) {
+      book.name = useName ? SL.cleanInput(input.value, 8) : '';
+      pick(book, next);
+    }
+    input.addEventListener('input', upd);
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(true); } });
+    screen('name', [
+      h('div', { class: 'bar' }, [btn('◀', 'icon', function () { pick(book, next - 1); }, { 'aria-label': '뒤로', 'data-act': 'back' }), h('h1', { class: 'title grow', text: '✏️ 이름 짓기' })]),
+      h('div', { class: 'scroll' }, [h('div', { class: 'finish' }, [
+        h('div', { class: 'card', style: 'pointer-events:none' }, [h('span', { class: 'ce', text: hero.e }), h('span', { class: 'cn', text: hero.n })]),
+        h('div', { class: 'prompt', text: hero.n + '의 이름을 지어 줄까요?' }),
+        h('label', { for: 'f-hero-name', text: '주인공 이름 (8자까지)' }), input, preview,
+        btn('👍 이 이름으로 할래요', 'primary big', function () { go(true); }, { 'data-act': 'name-ok' }),
+        btn('이름 없이 할래요', '', function () { go(false); }, { 'data-act': 'name-skip' })
+      ])])
+    ]);
+    upd();
+    speak(hero.n + '의 이름을 지어 줄까요?');
   }
 
   /* ---------- 마무리 ---------- */
@@ -400,7 +430,7 @@
     var offModel = SL.onModel(updBadge);
 
     screen('read', [
-      h('div', { class: 'bar' }, [btn('✕', 'icon', shelf, { 'aria-label': '책장으로', 'data-act': 'close' }), h('div', { class: 'grow title', text: book.title, style: 'font-size:19px' }), badge, playBtn]),
+      h('div', { class: 'bar' }, [btn('✕', 'icon', shelf, { 'aria-label': '책장으로', 'data-act': 'close' }), h('div', { class: 'grow title read-t', text: book.title }), badge, playBtn]),
       stage,
       h('div', { class: 'bar bottom' }, [prevB, pno, nextB])
     ]);
