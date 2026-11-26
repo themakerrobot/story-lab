@@ -706,7 +706,7 @@
           }
           var callback = c.kind === 'item' ? ' ' + T(st, '처음에 챙긴 {I:이/가} 큰 도움이 되었어요!', { I: c.item.n }) : '';
           if (c.kind === 'item') st.toolUsed = true;
-          page(stxt + ' ' + Q(resWho, res) + callback, 'solve', scene({ obj: [c.e, c.kind === 'item' ? null : st.ev.e], mood: 'happy', vil: null, guest: guest }));
+          page(stxt + ' ' + Q(resWho, res) + callback, 'solve', scene({ obj: [guest ? null : c.e, c.kind === 'item' ? null : st.ev.e], mood: 'happy', vil: null, guest: guest }));
           st.feel = null;
           break;
         }
