@@ -86,7 +86,7 @@
         h('button', { class: 'open', type: 'button', 'aria-label': b.title + ' 읽기', onclick: function () { read(b, 0); } }, [
           h('div', { class: 'cover' }, [sc]),
           h('div', { class: 'bt', text: b.title }),
-          h('div', { class: 'ba', text: '지은이 ' + (b.author || '나') })
+          h('div', { class: 'ba', text: b.author ? '지은이 ' + b.author : '내가 만든 그림책' })
         ]),
         btn('🗑️', 'icon del', function () {
           confirmBox('"' + b.title + '" 책을 지울까요?', '🗑️ 지우기', function () {
@@ -300,7 +300,7 @@
       book.title = SL.cleanInput(fTitle[1].value, 24) || S.autoTitle(book);
       book.author = SL.cleanInput(fAuthor[1].value, 10);
       ct.textContent = book.title;
-      ca.textContent = '지은이 ' + (book.author || '나');
+      ca.textContent = book.author ? '지은이 ' + book.author : '지은이 칸을 채워 봐요';
     }
     fName[1].addEventListener('input', refresh);
     fTitle[1].addEventListener('input', function () { titleTouched = true; refresh(); });
@@ -389,7 +389,8 @@
 
     function label(i) { var p = pages[i]; return p.kind === 'cover' ? '표지' : p.kind === 'end' ? '끝' : i + ' / ' + textCount; }
     function sentencesOf(p) {
-      if (p.kind === 'cover') return [book.title, '지은이 ' + (book.author || '나') + '.'];
+      /* 표지: 제목, 그리고 "하늘이 지은 이야기예요." (지은이가 없으면 제목만) */
+      if (p.kind === 'cover') return book.author ? [book.title, SL.J(book.author, '이/가') + ' 지은 이야기예요.'] : [book.title];
       if (p.kind === 'end') return [];
       return SL.splitSentences(p.t);
     }
@@ -401,9 +402,9 @@
       var txt = h('div', { class: 'txt' });
       sentEls = [];
       if (p.kind === 'cover') {
-        var t1 = h('div', { class: 'cover-t s', text: book.title }), t2 = h('div', { class: 'cover-a s', text: '지은이 ' + (book.author || '나') });
-        sentEls = [t1, t2];
-        txt.appendChild(t1); txt.appendChild(t2);
+        var t1 = h('div', { class: 'cover-t s', text: book.title }), t2 = book.author ? h('div', { class: 'cover-a s', text: '지은이 ' + book.author }) : null;
+        sentEls = t2 ? [t1, t2] : [t1];
+        sentEls.forEach(function (x) { txt.appendChild(x); });
       } else if (p.kind === 'end') {
         txt.appendChild(h('div', { class: 'the-end', text: '끝' }));
         txt.appendChild(h('div', { class: 'end-btns' }, [

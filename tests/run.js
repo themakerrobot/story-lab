@@ -288,7 +288,7 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     await page.waitForFunction(() => document.querySelector('[data-pno]').textContent === '끝' && document.querySelector('[data-act=play]').textContent.indexOf('읽어 주기') >= 0, null, { timeout: 30000 });
     const r = await page.evaluate(() => {
       const b = JSON.parse(localStorage.getItem('storylab-v1')).books[0];
-      const expect = [b.title, '지은이 ' + b.author + '.'];
+      const expect = [b.title, SL.J(b.author, '이/가') + ' 지은 이야기예요.'];
       SL.buildBook(b).filter((p) => p.kind === 'text').forEach((p) => {
         let at = 0;
         SL.splitSentences(p.t).forEach((s) => { const r = SL.speechParts(s, p.spk, at); at = r.at; r.parts.forEach((x) => expect.push(x.t)); });
@@ -303,7 +303,7 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     const r = await readTest('normal');
     assert(JSON.stringify(r.spoken) === JSON.stringify(r.expect), '읽은 순서가 다름\n' + JSON.stringify(r.spoken) + '\n' + JSON.stringify(r.expect));
     const norm = (x) => x.replace(/\s+/g, ' ').replace(/[.]$/, '').trim();
-    r.spoken.forEach((s, i) => assert(r.marks[i] && norm(r.marks[i]).indexOf(norm(s)) >= 0, `짚은 문장이 다름: ${r.marks[i]} / ${s}`));
+    r.spoken.forEach((s, i) => assert(i === 1 /* 표지: "지은이 ○○"를 "○○이 지은 이야기예요"로 읽는다 */ || (r.marks[i] && norm(r.marks[i]).indexOf(norm(s)) >= 0), `짚은 문장이 다름: ${r.marks[i]} / ${s}`));
   });
   await test('읽어 주기: onend 가 오지 않는 엔진에서도 시간 대비로 넘어감', async () => {
     const r = await readTest('silent');

@@ -243,6 +243,7 @@
       u.lang = 'ko-KR';
       u.rate = rate || 1;
       u.pitch = pitch || 1;
+      u.volume = 1;
       var v = pickVoice();
       if (v) u.voice = v;
       u.onend = function () { finish(true); };
@@ -308,6 +309,20 @@
     if (opts.voice !== 'ai' || model.state !== 'ready' || !text) return;
     synthPcm(text, opts.style, opts.rate).catch(function () { });
   };
+  /* 소리 크기 맞추기: 목소리·문장마다 크기가 달라 들쭉날쭉하다 → 말소리 크기(RMS)를 같은 값으로 맞춘다.
+     조용한 틈은 빼고 재며, 가장 큰 소리가 0.95 를 넘지 않게 하고, 너무 작은 소리를 지나치게 키우지 않는다(최대 6배) */
+  var TARGET_RMS = 0.075;
+  function normalize(pcm) {
+    var sum = 0, n = 0, peak = 0;
+    for (var i = 0; i < pcm.length; i++) { var v = Math.abs(pcm[i]); if (v > peak) peak = v; if (v > 0.01) { sum += v * v; n++; } }
+    if (!n || !peak) return pcm;
+    var rms = Math.sqrt(sum / n), g = Math.min(TARGET_RMS / rms, 0.95 / peak, 6);
+    if (Math.abs(g - 1) < 0.03) return pcm;
+    var out = new Float32Array(pcm.length);
+    for (var k = 0; k < pcm.length; k++) out[k] = pcm[k] * g;
+    return out;
+  }
+  SL.normalizePcm = normalize;
   function modelSay(text, opts, done) {
     var finished = false, src = null, timer = null, ac = typeof AbortController === 'function' ? new AbortController() : null;
     function finish(ok) { if (finished) return; finished = true; clearTimeout(timer); done(ok); }
@@ -317,7 +332,8 @@
       if (!a) throw new Error('오디오를 쓸 수 없어요');
       if (a.state === 'suspended') { try { a.resume(); } catch (e) { } }
       var buf = a.createBuffer(1, pcm.length, model.tts.sampleRate);
-      buf.copyToChannel ? buf.copyToChannel(pcm, 0) : buf.getChannelData(0).set(pcm);
+      var even = normalize(pcm);
+      buf.copyToChannel ? buf.copyToChannel(even, 0) : buf.getChannelData(0).set(even);
       src = a.createBufferSource();
       src.buffer = buf;
       src.connect(a.destination);
