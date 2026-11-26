@@ -418,3 +418,37 @@ input { font: inherit; }
 @media (hover: hover) { .scene.editable .ch:hover, .scene.editable .ob:hover { outline: 3px dashed rgba(255, 255, 255, .9); outline-offset: 2px; border-radius: 12px; } }
 .scene.editable .dragging { outline: 3px dashed rgba(255, 255, 255, .95); outline-offset: 2px; border-radius: 12px; }
 .scene.editable .dragging { cursor: grabbing; filter: drop-shadow(0 1.6cqh 0 rgba(0, 0, 0, .25)); z-index: 5; }
+
+
+/* ---------- 오늘의 국어 팁 ---------- */
+.tip { margin-top: 8px; text-align: left; background: #fff7d6; border: 1px dashed #e0b84a; border-radius: 16px; padding: 12px 14px; display: grid; gap: 4px; min-height: 48px; color: var(--ink); }
+.tip-k { font-size: 14px; font-weight: 800; color: var(--wood-3); }
+.tip-t { font-size: 16px; line-height: 1.5; word-break: keep-all; }
+@media (max-width: 760px) { .tip { display: none; } }
+
+/* ---------- 큰 화면: 높이를 화면에 맞춘다 ----------
+   작업대와 책장을 같은 높이로, 책장은 빈 선반까지 바닥까지. 선반 높이는 책 칸 크기로 고정 */
+@media (min-width: 900px) {
+  .scr-shelf .scroll { display: flex; flex-direction: column; }
+  .scr-shelf .wrap.home { flex: 1 0 auto; max-width: 1480px; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+  .scr-shelf .bench { position: static; display: flex; flex-direction: column; }
+  .scr-shelf .bench .in { flex: 1; align-content: start; }
+  .scr-shelf .bench .tip { margin-top: auto; }
+  .scr-shelf .bookcase { display: flex; flex-direction: column; --bw: 184px; --rh: 262px; }
+  .scr-shelf .books {
+    flex: 1; min-height: calc(var(--rh) * 2);
+    grid-template-columns: repeat(auto-fill, var(--bw)); grid-auto-rows: var(--rh); justify-content: space-evenly; align-content: start;
+    background:
+      repeating-linear-gradient(180deg, transparent 0 calc(var(--rh) - 20px), var(--wood-2) calc(var(--rh) - 20px) calc(var(--rh) - 17px), var(--wood-1) calc(var(--rh) - 17px) calc(var(--rh) - 6px), var(--wood-3) calc(var(--rh) - 6px) var(--rh)),
+      linear-gradient(180deg, #f2e2c4, #ead6b2);
+  }
+  .scr-shelf .book { height: var(--rh); overflow: hidden; }
+  .scr-shelf .book::after { display: none; }
+  .scr-shelf .book .bt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .scr-shelf .shelf-empty { align-self: center; padding: 0 16px 20px; }
+  .scr-shelf .shelf-empty::after { display: none; }
+}
+@media (min-width: 1600px) and (min-height: 900px) {
+  .scr-shelf .bookcase { --bw: 216px; --rh: 290px; }
+  .scr-shelf .wrap.home { grid-template-columns: minmax(360px, 420px) 1fr; }
+}

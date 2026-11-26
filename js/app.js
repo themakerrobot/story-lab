@@ -113,7 +113,8 @@
             h('span', { class: 'num', text: String(i + 1) }), h('b', { text: x[0], 'aria-hidden': 'true' }),
             h('span', { class: 'sl' }, [x[1], i === 3 && data.books.length ? h('small', { text: '최근 책 열기' }) : null]), h('span', { class: 'go', text: '›', 'aria-hidden': 'true' })
           ])]);
-        }))
+        })),
+        tipBox()
       ])
     ]);
     var bookcase = h('section', { class: 'bookcase', 'aria-label': '내 책장' }, [
@@ -124,6 +125,24 @@
       head(null, h('div', { class: 'grow sign' }, [h('span', { class: 'mark', text: '📚', 'aria-hidden': 'true' }), h('h1', { class: 'title', text: '그림책 공방' })]),
         [btn('⚙️', 'icon ghost', settings, { 'aria-label': '설정' })]),
       h('div', { class: 'scroll' }, [h('div', { class: 'wrap home' }, [bench, bookcase])])
+    ]);
+  }
+
+  /* 오늘의 국어 팁: 작업대 아래. 열 때마다 하나씩 (누르면 읽어 준다) */
+  var TIPS = [
+    ['이어 주는 말', '"그런데"가 나오면 사건이 시작돼요. 책에서 파란 글자로 보여요.'],
+    ['흉내 내는 말', '"바스락바스락", "쿵쿵"처럼 소리나 모양을 흉내 내는 말이에요.'],
+    ['이야기 순서', '처음 → 사건 → 해결 → 끝. 점 색깔이 이 순서를 알려 줘요.'],
+    ['마음 낱말', '무서웠어요, 속상했어요… 주인공의 마음을 골라 보세요.'],
+    ['원인과 결과', '가방에 챙긴 물건이 나중에 문제를 풀어 줄 수 있어요.'],
+    ['대사', '따옴표 " " 안의 말은 등장인물이 직접 하는 말이에요.'],
+    ['인물의 변화', '겁 많던 주인공이 이야기 끝에서 용감해지기도 해요.']
+  ];
+  function tipBox() {
+    var t = TIPS[Math.floor(Math.random() * TIPS.length)];
+    return h('button', { type: 'button', class: 'tip', 'data-tip': '', 'aria-label': '오늘의 국어 팁 듣기', onclick: function () { speak(t[0] + '. ' + t[1]); } }, [
+      h('span', { class: 'tip-k', text: '📖 오늘의 국어 팁 · ' + t[0] }),
+      h('span', { class: 'tip-t', text: t[1] })
     ]);
   }
 
