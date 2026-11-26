@@ -181,7 +181,7 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     await page.waitForSelector('[data-screen=name]');
     await page.fill('#f-hero-name', '달');
     await page.click('[data-act=name-ok]');
-    const q = await page.textContent('.prompt');
+    const q = await page.textContent('.qt');
     assert(q.indexOf('달') >= 0, '이름이 질문에 안 나옴: ' + q);
     /* 뒤로 가기 */
     await page.click('[data-act=random]');
@@ -218,18 +218,21 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     track(page); await ctx.close();
   });
 
-  await test('책장 작업대: 만드는 순서 단계를 누르면 이동, 주인공 16종(사람 6명)', async () => {
+  await test('첫 화면 학습지: 1 이야기 짓기 · 2 책장 · 3 국어 놀이, 메뉴 탭, 주인공 16종(사람 6명)', async () => {
     const { ctx, page } = await newPage({ viewport: { width: 1280, height: 800 } });
     await page.goto(BASE);
-    const steps = await page.$$('[data-step-go]');
-    assert(steps.length === 4, '단계 버튼 수 ' + steps.length);
-    for (const st of steps) { const b = await st.boundingBox(); assert(b.height >= 48, '단계 버튼이 48px 미만'); }
-    await page.click('[data-step-go="1"]');
-    assert(await page.$('[data-screen=worlds]'), '1단계를 눌러도 이야기 상자로 가지 않음');
-    await page.click('[data-act=back]');
-    await page.click('[data-step-go="4"]');
-    assert(await page.$('[data-screen=worlds]'), '책이 없을 때 4단계가 새 책으로 가지 않음');
-    await page.click('[data-world="adv"]'); await page.click('[data-preset="baby"]');
+    assert((await page.$$('.srow')).length === 3, '학습지 줄 수');
+    assert((await page.$$('[data-home-world]')).length === 8, '이야기 상자 칸 수');
+    for (const k of ['learn-echo', 'learn-words', 'learn-map', 'learn-quiz']) assert(await page.$(`.srow [data-act="${k}"]`), k + ' 칸 없음');
+    /* 책이 없으면 국어 놀이는 새 책 만들기로 안내 */
+    await page.click('.srow [data-act="learn-map"]');
+    assert(await page.$('[data-screen=worlds]'), '책이 없을 때 이야기 지도가 새 책으로 가지 않음');
+    await page.click('[data-nav=shelf]'); assert(await page.$('[data-screen=shelfpage]'), '책장 탭');
+    await page.click('[data-nav=learn]'); assert(await page.$('[data-screen=learn]'), '국어 놀이 탭');
+    await page.click('.brand'); assert(await page.$('[data-screen=shelf]'), '로고를 누르면 처음 화면');
+    await page.click('[data-home-world="adv"]');
+    assert(await page.$('[data-screen=plan]'), '첫 화면 이야기 상자 칸이 설계도로 가지 않음');
+    await page.click('[data-preset="baby"]');
     const heroes = await page.$$eval('[data-step=hero] .card .cn', (a) => a.map((x) => x.textContent));
     assert(heroes.length === 16, '주인공 수 ' + heroes.length);
     ['소녀', '소년', '아주머니', '아저씨', '할머니', '할아버지'].forEach((n) => assert(heroes.indexOf(n) >= 0, n + ' 없음'));
@@ -240,9 +243,68 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     await page.waitForSelector('[data-screen=read]');
     const first = await page.evaluate(() => JSON.parse(localStorage.getItem('storylab-v1')).books[0].pages[0].t);
     assert(first.indexOf('할머니가 살았어요') >= 0, '할머니 소개 문장: ' + first);
+    track(page); await ctx.close();
+  });
+
+  await test('순서도 보기(옵션): 처음→사건→해결→끝 칸, 고른 칸을 눌러 다시 고르기, 카드로 돌아가기', async () => {
+    const { ctx, page } = await newPage({ viewport: { width: 1280, height: 800 } });
+    await page.goto(BASE);
+    await page.click('[data-act=new]'); await page.click('[data-world="adv"]'); await page.click('[data-preset="kid"]');
+    await page.click('[data-act=random]'); await page.click('[data-act=name-skip]');
+    for (let n = 0; n < 4; n++) await page.click('[data-act=random]');
+    await page.click('[data-act=view-flow]');
+    const steps = await page.$$('[data-flow-step]');
+    const plan = await page.evaluate(() => SL.story.plan(SL.data.PRESETS[1], 'adv').length);
+    assert(steps.length === plan, '순서도 칸 수 ' + steps.length + ' / ' + plan);
+    const parts = await page.$$eval('.flow .fpart', (a) => a.map((x) => x.textContent));
+    assert(JSON.stringify(parts) === JSON.stringify(['처음', '사건', '해결', '사건', '해결', '끝']), '마디 ' + JSON.stringify(parts));
+    const done = await page.$$eval('.fstep:not(.todo):not(.now)', (a) => a.length);
+    assert(done === 5, '고른 칸 수 ' + done);
+    assert(await page.$('.fstep.todo[disabled]'), '아직 안 고른 칸이 눌림');
+    /* 2번째 칸(성격)을 다시 고르기 */
+    await page.click('[data-flow-step="trait"]');
+    assert((await page.$$eval('.fstep:not(.todo):not(.now)', (a) => a.length)) === 1, '다시 고를 때 뒤 칸이 비워지지 않음');
+    assert(await page.$('[data-flow-step="trait"].now'), '다시 고를 칸이 지금 칸이 아님');
+    await page.click('[data-act=view-cards]');
+    assert(await page.$('[data-step=trait] .card'), '카드로 돌아가지 않음');
+    track(page); await ctx.close();
+  });
+
+  await test('국어 놀이: 따라 읽기 · 낱말장 · 이야기 지도 · 이야기 돌아보기', async () => {
+    const { ctx, page } = await newPage();
+    await page.goto(BASE);
+    await makeBook(page, { preset: 'big', world: 'adv' });
+    if ((await page.textContent('[data-act=play]')).indexOf('멈추기') >= 0) await page.click('[data-act=play]');
+    /* 따라 읽기: 문장을 읽은 뒤 "따라 읽어 봐요"가 나오고 같은 문장이 파랗게 남는다 */
+    await page.click('[data-act=echo]');
+    for (let n = 0; n < 40 && (await page.textContent('[data-pno]')) !== '표지'; n++) await page.keyboard.press('ArrowLeft');
+    await page.click('[data-act=next]');
+    await page.click('[data-act=play]');
+    await page.waitForFunction(() => document.querySelector('.s.echo') && document.querySelector('.echo-tip').textContent.indexOf('따라 읽어') >= 0, null, { timeout: 10000 });
+    await page.click('[data-act=play]');
     await page.click('[data-act=close]');
-    await page.click('[data-step-go="4"]');
-    assert(await page.$('[data-screen=read]'), '4단계가 최근 책을 열지 않음');
+    /* 낱말장 */
+    await page.click('.srow [data-act="learn-words"]');
+    const words = await page.$$eval('[data-word]', (a) => a.map((x) => x.getAttribute('data-word')));
+    assert(words.length >= 3, '낱말 수 ' + words.length);
+    assert(await page.$('.wordbook.c-green [data-word]'), '마음 낱말이 없음 (꾸미기 카드의 기분)');
+    await page.click('[data-word] >> nth=0');
+    await page.waitForFunction(() => window.__spoken.length > 0);
+    /* 이야기 지도: 네 칸 모두 채워짐 */
+    await page.click('[data-nav=learn]');
+    await page.click('[data-act="learn-map"]');
+    for (const part of ['start', 'event', 'solve', 'end']) assert((await page.$$(`[data-map-part="${part}"] .mp`)).length >= 1, part + ' 칸이 비었음');
+    /* 이야기 돌아보기: 틀리면 다시, 맞으면 "참 잘했어요" (점수 없음) */
+    await page.click('[data-nav=learn]');
+    await page.click('[data-act="learn-quiz"]');
+    const qn = (await page.$$('.qcard')).length;
+    assert(qn >= 5, '질문 수 ' + qn);
+    const wrong = await page.$('.qcard[data-q="0"] [data-opt]:not([data-right])');
+    await wrong.click();
+    assert(await page.$('.qcard[data-q="0"] .wrong[disabled]'), '틀린 답 표시');
+    await page.click('.qcard[data-q="0"] [data-right]');
+    assert((await page.textContent('.qcard[data-q="0"] .mark')).indexOf('잘했어요') >= 0, '맞힌 표시');
+    assert(!(await page.textContent('.quiz')).match(/점수|등수|순위|\d+점/), '점수·순위 말이 나옴');
     track(page); await ctx.close();
   });
 
@@ -532,7 +594,7 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     await page.click('[data-book] .open');
     await page.click('[data-act=next]');
     await page.waitForTimeout(200);
-    const r = await page.evaluate(() => ({ imgs: document.querySelectorAll('img').length, cover: document.querySelector('.read-t').textContent, txt: document.querySelector('.txt').textContent }));
+    const r = await page.evaluate(() => ({ imgs: document.querySelectorAll('img[src="x"], [onerror]').length, cover: document.querySelector('.read-t').textContent, txt: document.querySelector('.txt').textContent }));
     assert(shelfTxt === X, '책장 제목이 글자로 안 보임: ' + shelfTxt);
     assert(r.imgs === 0, 'img 요소가 만들어짐');
     assert(r.cover === X && r.txt.indexOf('<img') >= 0, '글자로 안 보임 ' + JSON.stringify(r));

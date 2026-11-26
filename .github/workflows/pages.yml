@@ -19,6 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # 디자인 킷 복사본이 원본(themakerrobot/themaker-ui)과 같은지. 고칠 것이 있으면 킷을 고치고 다시 복사한다
+      - name: Design kit
+        run: |
+          KIT=v1.4.0
+          curl -sSfL -o /tmp/kit.css "https://raw.githubusercontent.com/themakerrobot/themaker-ui/$KIT/themaker-ui.css"
+          diff -u /tmp/kit.css css/themaker-ui.css
       # 배포본: 테스트·문서·개발 파일만 빼고 전부 (목록을 나열하면 새 폴더가 빠지는 일이 생긴다)
       - name: Build site
         run: |
