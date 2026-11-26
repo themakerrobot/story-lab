@@ -218,6 +218,37 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     track(page); await ctx.close();
   });
 
+  await test('AI 목소리 준비 진행률: 앱을 열 때 자동으로 불러오면 상단바·준비 칸이 0%에서 멈추지 않고 완료까지 바뀜', async () => {
+    const { ctx, page } = await newPage({ viewport: { width: 412, height: 915 } });
+    /* 한 번 준비해 둔 기기처럼: aiReady 를 켜고, 모델 준비는 천천히 진행 소식을 보낸다 */
+    await ctx.addInitScript(() => {
+      try { if (!localStorage.getItem('storylab-v1')) localStorage.setItem('storylab-v1', JSON.stringify({ v: 1, author: '', rate: 1, style: 'F1', aiReady: true, books: [] })); } catch (e) { }
+      window.__SL_FAKE_TTS.load = (onStatus) => new Promise((resolve) => {
+        let i = 0;
+        const t = setInterval(() => {
+          i++;
+          if (i <= 4) onStatus(`AI 목소리 내려받는 중 (${i}/4) 5.0 / 10.0 MB`);
+          else { clearInterval(t); resolve(); }
+        }, 300);
+      });
+    });
+    await page.goto(BASE);
+    const seen = new Set();
+    for (let n = 0; n < 40; n++) {
+      seen.add(await page.textContent('[data-voice-state]'));
+      if ((await page.textContent('[data-voice-state]')).indexOf('AI 목소리') >= 0) break;
+      await page.waitForTimeout(100);
+    }
+    const head = await page.textContent('[data-voice-state]');
+    assert(head.indexOf('AI 목소리') >= 0, '상단바가 준비 완료로 바뀌지 않음: ' + head + ' / 본 값 ' + [...seen].join(','));
+    assert([...seen].some((x) => /[1-9]\d*%/.test(x)), '진행률이 0%에서 움직이지 않음: ' + [...seen].join(','));
+    assert(!(await page.$('[data-voice-panel][data-state=loading]')), '첫 화면 준비 칸이 준비 중에 멈춤');
+    /* 다른 화면에 갔다 와도 구독이 살아 있는지: 책장 → 처음 화면 */
+    await page.click('[data-nav=shelf]'); await page.click('.brand');
+    assert((await page.textContent('[data-voice-state]')).indexOf('AI 목소리') >= 0, '화면을 옮긴 뒤 상단바 상태가 틀림');
+    track(page); await ctx.close();
+  });
+
   await test('첫 화면 학습지: 1 이야기 짓기 · 2 책장 · 3 국어 놀이, 메뉴 탭, 주인공 16종(사람 6명)', async () => {
     const { ctx, page } = await newPage({ viewport: { width: 1280, height: 800 } });
     await page.goto(BASE);

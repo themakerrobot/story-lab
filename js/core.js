@@ -194,7 +194,7 @@
   SL.loadModel = function () {
     if (model.loading) return model.loading;
     model.state = 'loading'; model.msg = 'AI 목소리를 준비하는 중'; model.err = ''; model.pct = 0; modelEmit();
-    var make = global.__SL_FAKE_TTS ? Promise.resolve({ load: function () { return Promise.resolve(); }, synth: function (t, o) { return global.__SL_FAKE_TTS.synth(t, o); }, sampleRate: global.__SL_FAKE_TTS.sampleRate || 16000 })
+    var make = global.__SL_FAKE_TTS ? Promise.resolve({ load: function (onStatus) { return global.__SL_FAKE_TTS.load ? global.__SL_FAKE_TTS.load(onStatus) : Promise.resolve(); }, synth: function (t, o) { return global.__SL_FAKE_TTS.synth(t, o); }, sampleRate: global.__SL_FAKE_TTS.sampleRate || 16000 })
       : import('./tts-client.js').then(function (m) { return m.createTTS(); });
     function onStatus(msg) {
       model.msg = msg;

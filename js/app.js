@@ -26,18 +26,26 @@
   function btn(text, cls, on, attrs) { attrs = attrs || {}; attrs.class = 'btn ' + (cls || ''); attrs.type = 'button'; attrs.text = text; attrs.onclick = on; return h('button', attrs); }
   function screen(name, kids) {
     if (leaveRead) { var f = leaveRead; leaveRead = null; f(); }
-    screenOffs.splice(0).forEach(function (off) { try { off(); } catch (e) { } });
     SL.stopSpeak();
     closeModal();
     app.textContent = '';
     var s = h('div', { class: 'screen scr-' + name, 'data-screen': name }, kids);
     app.appendChild(s);
+    /* 새 화면의 부품(상단바·목소리 칸)은 이 함수가 불리기 전에 만들어져 이미 구독해 있다.
+       그래서 화면에 붙은 뒤, 화면에 없는 부품의 구독만 푼다 (예전에는 새 화면 것까지 풀려 진행률이 멈췄다) */
+    screenOffs = screenOffs.filter(function (off) {
+      if (off._el && off._el.isConnected) return true;
+      try { off(); } catch (e) { }
+      return false;
+    });
     if (pendingReload && name !== 'read') { location.reload(); }
     return s;
   }
   function speakOpts() { return { rate: data.rate, style: data.style }; }
   /* 화면을 바꿀 때 풀어 줄 구독 (AI 목소리 상태 등) */
   var screenOffs = [];
+  /* el 이 화면에 있는 동안만 살아 있는 구독 */
+  function keepOff(el, off) { off._el = el; screenOffs.push(off); return off; }
   function speak(text) { SL.say(text, speakOpts()); }
   var toastTimer = null;
   function toast(msg, ms) {
@@ -84,7 +92,7 @@
       voiceBtn.classList.toggle('off', st !== 'ready');
       voiceBtn.setAttribute('data-ic', st === 'ready' ? '🎙️' : '🔇');
     }
-    screenOffs.push(SL.onModel(upd)); upd();
+    keepOff(voiceBtn, SL.onModel(upd)); upd();
     var fsBtn = h('button', { type: 'button', class: 'hbtn', 'aria-label': '전체 화면', title: '전체 화면', onclick: function () {
       try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) { }
     } }, ['⛶']);
@@ -917,7 +925,7 @@
         box.appendChild(h('div', { class: 'note-box', text: '영상에는 AI 목소리가 들어가요. 먼저 AI 목소리를 준비해 주세요.' }));
         panel = voicePanel(false); box.appendChild(panel);
         var offReady = SL.onModel(function (m) { if (m.state === 'ready') { offReady(); if (panel._off) panel._off(); draw('idle'); } });
-        screenOffs.push(offReady);
+        keepOff(box, offReady);
       } else if (state === 'idle') {
         box.appendChild(h('div', { class: 'note-box', text: '목소리를 만드는 데 몇 분 걸릴 수 있어요. 만드는 동안 이 창을 열어 두세요.' }));
         box.appendChild(btn('🎬 영상 만들기', 'primary big block', make, { 'data-act': 'video-make' }));
@@ -992,7 +1000,7 @@
     var off = SL.onModel(draw);
     draw();
     box._off = off;
-    screenOffs.push(off);
+    keepOff(box, off);
     return box;
   }
   function prepareVoice() {
