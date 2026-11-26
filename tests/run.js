@@ -512,6 +512,38 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     track(page); await ctx.close();
   });
 
+  await test('영상(MP4) 내려받기: 펼친 책 + 책장 넘기기 + AI 목소리 → H.264 MP4', async () => {
+    const { ctx, page } = await newPage({ viewport: { width: 1280, height: 800 } });
+    await page.goto(BASE);
+    await makeBook(page, { preset: 'baby', world: 'space', name: '콩이', author: '하늘' });
+    if ((await page.textContent('[data-act=play]')).indexOf('멈추기') >= 0) await page.click('[data-act=play]');
+    await page.click('[data-act=video]');
+    await page.click('[data-act=video-make]');
+    await page.waitForSelector('[data-act=video-download]', { timeout: 120000 });
+    const r = await page.evaluate(async () => {
+      const a = document.querySelector('[data-act=video-download]');
+      const buf = new Uint8Array(await (await fetch(a.href)).arrayBuffer());
+      const txt = new TextDecoder('latin1').decode(buf);
+      return { name: a.getAttribute('download'), size: buf.length, ftyp: txt.indexOf('ftyp') === 4, moov: txt.indexOf('moov') >= 0, avc: txt.indexOf('avc1') >= 0 || txt.indexOf('vp09') >= 0, audio: txt.indexOf('Opus') >= 0 || txt.indexOf('mp4a') >= 0, info: document.querySelector('.modal .small').textContent };
+    });
+    console.log(`    ${r.info}`);
+    assert(r.name === '콩이의 우주 탐험.mp4', '파일 이름 ' + r.name);
+    assert(r.size > 100000 && r.ftyp && r.moov && r.avc && r.audio, 'MP4 형식이 아님 ' + JSON.stringify(r));
+    await page.click('[data-act=video-close]');
+    track(page); await ctx.close();
+  });
+
+  await test('영상(MP4): AI 목소리 준비 전에는 준비하라고 안내', async () => {
+    const { ctx, page } = await newPage({ speech: 'none' });
+    await page.goto(BASE);
+    await makeBook(page, { preset: 'baby' });
+    if ((await page.textContent('[data-act=play]')).indexOf('멈추기') >= 0) await page.click('[data-act=play]');
+    await page.click('[data-act=video]');
+    assert(!(await page.$('[data-act=video-make]')), '목소리 없이 만들기 단추가 나옴');
+    assert(await page.$('.modal [data-voice-panel]'), '목소리 준비 칸이 없음');
+    track(page); await ctx.close();
+  });
+
   /* 4. 반응형 */
   const SIZES = [[320, 568], [360, 640], [390, 844], [412, 360], [640, 320], [768, 1024], [1024, 768], [1180, 820], [1366, 768], [1920, 1080]];
   await test('반응형: ' + SIZES.map((s) => s.join('×')).join(', ') + ' 모든 화면', async () => {

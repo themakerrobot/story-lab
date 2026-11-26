@@ -901,7 +901,70 @@
     draw();
   }
 
-  function videoExport(book) { toast('영상 만들기를 준비하고 있어요.'); }
+  /* ---------- 영상(MP4)으로 내려받기 ----------
+     읽기 화면처럼 펼친 책 + 책장 넘기기 + AI 목소리. 이 기기 안에서 만들고, 서버로 보내지 않는다 */
+  function videoExport(book) {
+    var box, busy = false, stopIt = false, url = null, panel = null;
+    function fileName() { return (book.title || '그림책').replace(/[\\/:*?"<>|]+/g, '').slice(0, 40) + '.mp4'; }
+    function cleanup() { stopIt = true; if (url) { URL.revokeObjectURL(url); url = null; } if (panel && panel._off) panel._off(); }
+    function draw(state, info) {
+      box.textContent = '';
+      box.appendChild(h('h2', { text: '🎬 영상으로 내려받기' }));
+      box.appendChild(h('p', { text: '책장을 넘기며 AI 목소리로 읽어 주는 영상(MP4)을 이 기기 안에서 만들어요. 서버로 보내지 않아요.' }));
+      if (!SL.videoSupported()) {
+        box.appendChild(h('div', { class: 'note-box', text: '이 브라우저는 영상 만들기를 지원하지 않아요. 크롬이나 엣지에서 해 주세요.' }));
+      } else if (SL.model.state !== 'ready') {
+        box.appendChild(h('div', { class: 'note-box', text: '영상에는 AI 목소리가 들어가요. 먼저 AI 목소리를 준비해 주세요.' }));
+        panel = voicePanel(false); box.appendChild(panel);
+        var offReady = SL.onModel(function (m) { if (m.state === 'ready') { offReady(); if (panel._off) panel._off(); draw('idle'); } });
+        screenOffs.push(offReady);
+      } else if (state === 'idle') {
+        box.appendChild(h('div', { class: 'note-box', text: '목소리를 만드는 데 몇 분 걸릴 수 있어요. 만드는 동안 이 창을 열어 두세요.' }));
+        box.appendChild(btn('🎬 영상 만들기', 'primary big block', make, { 'data-act': 'video-make' }));
+      } else if (state === 'busy') {
+        box.appendChild(h('div', { class: 'video-prog prg' }, [h('div', { class: 'lb' }, [h('span', { text: info.label, 'data-video-phase': '' }), h('span', { class: 'num', text: info.pct + '%' })]), h('div', { class: 'track' }, [h('div', { class: 'fill', style: 'width:' + info.pct + '%' })])]));
+        box.appendChild(btn('그만두기', '', function () { stopIt = true; }, { 'data-act': 'video-stop' }));
+      } else if (state === 'done') {
+        var v = h('video', { class: 'video-prev', controls: true, src: url, playsinline: true });
+        box.appendChild(v);
+        box.appendChild(h('p', { class: 'small', text: '영상 길이 약 ' + Math.round(info.seconds) + '초 · ' + (info.audio === 'aac' ? 'H.264 + AAC' : 'H.264 + Opus') + ' · ' + (info.blob.size / 1048576).toFixed(1) + 'MB' }));
+        if (info.audio !== 'aac') box.appendChild(h('p', { class: 'small', text: '이 브라우저는 AAC 소리를 만들 수 없어 Opus 소리로 담았어요. 아이폰·아이패드에서는 소리가 안 나올 수 있어요.' }));
+        box.appendChild(h('a', { class: 'btn primary big block', href: url, download: fileName(), 'data-act': 'video-download' }, ['⬇ 내려받기 (' + fileName() + ')']));
+      } else if (state === 'error') {
+        box.appendChild(h('div', { class: 'note-box', text: info }));
+        box.appendChild(btn('다시 해 보기', 'primary block', make, { 'data-act': 'video-make' }));
+      }
+      box.appendChild(h('div', { class: 'row', style: 'margin-top:14px' }, [btn('닫기', '', function () { if (busy) stopIt = true; closeModal(); cleanup(); }, { 'data-act': 'video-close' })]));
+    }
+    function make() {
+      if (busy) return;
+      busy = true; stopIt = false;
+      draw('busy', { label: 'AI 목소리를 만드는 중', pct: 0 });
+      var last = 0;
+      SL.makeVideo(book, {
+        voiceOf: function (who) { return voiceOf(book, who); },
+        isCancelled: function () { return stopIt; },
+        onProgress: function (phase, d, t) {
+          var pct = phase === 'voice' ? Math.round(d / t * 60) : 60 + Math.round(d / t * 40);
+          if (pct === last && d < t) return;
+          last = pct;
+          draw('busy', { label: phase === 'voice' ? 'AI 목소리를 만드는 중 (' + d + ' / ' + t + ')' : '책장을 넘기며 영상을 만드는 중', pct: pct });
+        }
+      }).then(function (r) {
+        busy = false;
+        if (url) URL.revokeObjectURL(url);
+        url = URL.createObjectURL(r.blob);
+        draw('done', r);
+      }).catch(function (e) {
+        busy = false;
+        if (e && e.name === 'AbortError') { draw('idle'); return; }
+        console.warn('영상 만들기 실패', e);
+        draw('error', '영상을 만들지 못했어요. ' + ((e && e.message) || ''));
+      });
+    }
+    box = modal([], cleanup);
+    draw('idle');
+  }
 
   /* ---------- 설정 ---------- */
   /* AI 목소리 준비 칸: 상태·진행률·준비 단추 (책장 작업대, 설정, 읽기 화면에서 같이 쓴다) */

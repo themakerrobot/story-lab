@@ -36,6 +36,13 @@ ai-lab과 같은 더 메이커 공통 디자인 킷([`themakerrobot/themaker-ui`
 - 쪽은 ◀ ▶ 버튼, 키보드 ← → (Esc는 책장으로), 그림을 옆으로 밀기로 넘깁니다.
 - 글에서 **이어 주는 말**(그런데, 그래서, 드디어…)은 파란 글씨, **흉내 내는 말**(바스락바스락, 쿵쿵…)은 물결 밑줄로 표시됩니다.
 
+## 영상(MP4)으로 내려받기 (읽기 화면의 🎬)
+
+- 읽기 화면처럼 펼친 책(왼쪽 장면, 오른쪽 글)에서 **책장을 넘기며 AI 목소리로 읽어 주는 영상**을 이 기기 안에서 만듭니다. 서버로 보내지 않습니다.
+- 해설과 대사는 꾸미기에서 정한 인물별 목소리로 들어가고, 읽는 문장은 노랗게 짚습니다.
+- 형식은 1280×720, 24fps, H.264 영상입니다. 소리는 AAC이고, 브라우저가 AAC를 만들 수 없으면 Opus로 담습니다(오픈소스 Chromium이 그렇습니다). WebCodecs로 만들어 실시간보다 빠르고, `mp4-muxer`(MIT, `vendor/mp4-muxer/`)로 MP4 파일로 묶습니다.
+- AI 목소리를 먼저 준비해야 합니다. 크롬·엣지에서 됩니다. Safari의 WebCodecs 소리 지원은 확인이 필요합니다.
+
 ## 국어 놀이
 
 | 놀이 | 하는 일 |
@@ -102,6 +109,8 @@ ai-lab과 같은 더 메이커 공통 디자인 킷([`themakerrobot/themaker-ui`
 | Supertonic 3 모델 (Supertone Inc.), INT8 변환본 | 브라우저가 HF에서 내려받아 기기에서 실행 | BigScience Open RAIL-M → [`licenses/OpenRAIL-M.txt`](licenses/OpenRAIL-M.txt), 변환 내용 [`licenses/Supertonic3-int8-MODIFICATIONS.md`](licenses/Supertonic3-int8-MODIFICATIONS.md) |
 | Supertonic 웹 예제 코드 | `js/tts.js`의 바탕 (yjworks/story-play를 거침) | MIT → [`licenses/Supertonic-code-MIT.txt`](licenses/Supertonic-code-MIT.txt) |
 | ONNX Runtime Web 1.22.0 | `vendor/ort/` 사본, 또는 jsDelivr | MIT → [`licenses/onnxruntime-MIT.txt`](licenses/onnxruntime-MIT.txt) |
+| mp4-muxer 5.2.1 (Vanilagy) | `vendor/mp4-muxer/` — 영상을 MP4로 묶기 | MIT → [`licenses/mp4-muxer-MIT.txt`](licenses/mp4-muxer-MIT.txt) |
+| Pretendard · Gowun Batang | `fonts/` 셀프호스팅 | SIL OFL 1.1 |
 
 OpenRAIL-M의 사용 제한(Attachment A)은 이 앱을 쓰는 모든 사용자에게 적용됩니다.
 
@@ -115,6 +124,7 @@ js/stories.js         이야기 카드와 조립 엔진
 js/scenes.js          자동 장면 그림(배경 SVG + 인물 배치), buildBook
 js/app.js             화면 흐름 (학습지, 만들기, 읽기, 국어 놀이, 꾸미기)
 js/icons.js           펜 선 그림
+js/video.js           영상(MP4) 만들기
 css/themaker-ui.css   디자인 킷 복사본 (고치지 않음)
 fonts/                Pretendard, Gowun Batang
 img/                  로고
