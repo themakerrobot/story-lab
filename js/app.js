@@ -89,7 +89,7 @@
       try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) { }
     } }, [SL.hicon(document.fullscreenElement ? 'compress' : 'expand')]);
     return h('header', { class: 'lab' }, [
-      h('h1', {}, [h('button', { type: 'button', class: 'brand', 'aria-label': '처음 화면', onclick: shelf }, [h('img', { src: 'img/pibo-logo.png', alt: '' }), h('span', { class: 'brand-txt', text: 'Story Lab' })])]),
+      h('h1', {}, [h('button', { type: 'button', class: 'brand', 'aria-label': '처음 화면', onclick: shelf }, [h('img', { src: 'img/book-logo.svg', alt: '' }), h('span', { class: 'brand-txt', text: 'Story Lab' })])]),
       nav('만들기', worlds, 'make'), nav('책장', shelfPage, 'shelf'), nav('국어 놀이', learnHub, 'learn'),
       h('span', { class: 'hsp' }),
       voiceBadge(settings),
