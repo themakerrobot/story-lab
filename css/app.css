@@ -14,7 +14,7 @@
   /* 이야기 마디 색: 처음 초록 · 사건 빨간 펜 · 해결 남색 펜 · 끝 갈색 괘선 (ai-lab 메뉴 색과 같은 짝) */
   --p-start: var(--ok); --p-event: var(--pen-red); --p-solve: var(--pen-blue); --p-end: var(--line-d);
   --hl: color-mix(in srgb, #F2C94C 55%, var(--panel));
-  --top: 56px; --bottom: 70px;
+  --top: 40px; --bottom: 70px;
   --emoji: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji";
   --sans: 'Pretendard Variable', Pretendard, -apple-system, 'Segoe UI', sans-serif;
 }
@@ -39,19 +39,38 @@ input { font: inherit; }
 .scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
 .grow { flex: 1; min-width: 0; }
 
-/* ── 2. 상단바 (킷 header 를 크게) ── */
-header.lab { margin: 0; border-radius: 0; height: var(--top); padding: 0 8px 0 10px; gap: 2px; box-shadow: 0 1px 0 var(--line-soft); position: relative; z-index: 5; }
-header.lab h1 { padding-right: 10px; min-width: 0; }
-header.lab .brand { display: flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font-family: var(--serif); font-size: 19px; font-weight: 700; background: none; border: 0; min-height: 48px; padding: 0 4px; white-space: nowrap; }
-header.lab .brand img { height: 26px; width: auto; }
-header.lab .navlink { height: var(--top); padding: 3px 14px 0; font-size: 16px; font-weight: 700; color: var(--ink3); border-bottom-width: 3px; min-width: 48px; justify-content: center; }
+/* ── 2. 상단바 — ai-lab 과 같은 치수 (높이 40, 로고 24, 메뉴 14.5px, 단추 30). 휴대폰은 두 줄 ── */
+header.lab { margin: 0; border-radius: 0; height: var(--top); padding: 0 10px; gap: 2px; box-shadow: 0 1px 0 var(--line-soft); position: relative; z-index: 5; }
+header.lab h1 { padding-right: 14px; min-width: 0; }
+header.lab .brand { display: flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font-family: var(--serif); font-size: 17px; font-weight: 700; background: none; border: 0; padding: 0; white-space: nowrap; cursor: pointer; }
+header.lab .brand img { height: 24px; width: auto; }
+header.lab .navlink { height: var(--top); padding: 3px 13px 0; font-size: 14.5px; font-weight: 700; color: var(--ink3); border-bottom-width: 3px; justify-content: center; white-space: nowrap; }
 header.lab .navlink:hover { color: var(--ink); border-bottom-color: var(--line-soft); }
 header.lab .navlink.on { color: var(--pen-blue-d); border-bottom-color: var(--pen-blue); }
-header.lab .hbtn { width: 48px; height: 48px; margin-left: 4px; border-color: var(--line-soft); font-size: 19px; font-weight: 700; }
-header.lab .hbtn.wide { width: auto; padding: 0 12px; gap: 6px; font-size: 15px; }
+header.lab .hsp { flex: 1; }
+header.lab .hbtn { width: 30px; height: 30px; margin-left: 4px; border-color: var(--line-soft); font-size: 13px; font-weight: 700; flex: none; }
+header.lab .hbtn.hbox { width: auto; padding: 0 10px; gap: 6px; white-space: nowrap; }
+header.lab .hbtn.hbox.on { border-color: var(--ink2); color: var(--ink); }
 header.lab .hbtn.off { color: var(--pen-red); border-color: color-mix(in srgb, var(--pen-red) 40%, var(--panel)); }
+header.lab .hbtn.busy span { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+.hic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hic .f { fill: currentColor; stroke: none; }
+@media (max-width: 900px) {
+  header.lab .hbtn.hbox:not(.voice) span { display: none; }
+  header.lab .hbtn.hbox:not(.voice) { padding: 0; width: 30px; }
+  header.lab .navlink { padding: 3px 9px 0; font-size: 13.5px; }
+}
+@media (max-width: 700px) {
+  /* 위 줄은 로고 + 단추, 아래 줄은 메뉴 셋을 똑같은 너비로 (ai-lab 과 같음) */
+  header.lab:not(.read-h) { padding: 4px 6px 0; gap: 0; height: auto; flex-wrap: wrap; overflow: visible; }
+  header.lab:not(.read-h) h1 { padding-right: 6px; height: 34px; display: flex; align-items: center; }
+  header.lab .hbtn { margin-left: 3px; }
+  header.lab #fsBtn { display: none; }
+  header.lab .navlink { order: 3; flex: 1 0 33.33%; max-width: 33.33%; height: 36px; padding: 3px 2px 0; font-size: 13px; }
+  header.lab:not(.read-h)::after { content: ""; order: 2; flex-basis: 100%; height: 0; }
+}
 .back { flex: none; }
-.htitle { font-family: var(--serif); font-size: 19px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; min-width: 0; }
+.htitle { font-family: var(--serif); font-size: 15.5px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; min-width: 0; }
 
 /* 단계 표시줄 (킷 #steps): 맨 앞에 활동 이름(명조), 지금 단계는 남색 */
 .steps.lab { min-height: 44px; padding: 4px 14px; border-bottom-color: var(--line-soft); gap: 0; }
@@ -396,9 +415,7 @@ header.lab .hbtn.off { color: var(--pen-red); border-color: color-mix(in srgb, v
   .cell + .cell { border-left: 0; }
 }
 @media (max-width: 760px) {
-  :root { --top: 54px; --bottom: 66px; }
-  header.lab .navlink { padding: 3px 9px 0; font-size: 15px; }
-  header.lab .brand .brand-txt { display: none; }
+  :root { --bottom: 66px; }
   .sheet-wrap { padding: 8px; }
   .sheet { padding: 12px 12px 10px; }
   .sheet-top h2 { font-size: 23px; }
@@ -421,9 +438,8 @@ header.lab .hbtn.off { color: var(--pen-red); border-color: color-mix(in srgb, v
   .modal { padding: 16px; } .deco-foot { bottom: -16px; margin: 14px -16px -16px; padding: 10px 16px 12px; }
   .deco-tabs .btn { flex-basis: 90px; font-size: 15px; padding: 6px 8px; }
 }
-@media (max-width: 420px) { header.lab .hbtn.wide { font-size: 0; width: 48px; padding: 0; } header.lab .hbtn.wide::before { content: attr(data-ic); font-size: 19px; } }
 @media (max-height: 500px) {
-  :root { --top: 50px; --bottom: 58px; }
+  :root { --bottom: 58px; }
   .scr-read .txt { font-size: 20px; line-height: 1.6; }
   .scr-read .pg { padding: 10px; }
   .q .qt { font-size: 20px; }
@@ -441,11 +457,12 @@ header.lab .hbtn.off { color: var(--pen-red); border-color: color-mix(in srgb, v
 
 /* 이야기 상자 줄: 넓은 화면은 4칸씩 */
 @media (min-width: 761px) { .cells.four .cell { flex: 0 0 25%; } .cells.four .cell:nth-child(4n+1) { border-left: 0; } .cells.four .cell:nth-child(n+5) { border-top: 1px dashed var(--line-soft); } }
-/* 아주 좁은 화면: 상단바에 메뉴 탭과 설정만 (목소리 상태는 첫 화면·설정에서) */
-header.lab .brand { min-width: 48px; justify-content: center; }
-@media (max-width: 480px) { header.lab [aria-label="전체 화면"] { display: none; } }
-@media (max-width: 400px) {
-  header.lab [data-voice-state] { display: none; }
-  header.lab .navlink { padding: 3px 7px 0; font-size: 14px; }
-  header.lab h1 { padding-right: 2px; }
-}
+/* 읽기 화면 상단바: 좁으면 꾸미기·영상은 그림만 */
+@media (max-width: 600px) { header.lab.read-h .hbtn.hbox:not(.voice) span { display: none; } header.lab.read-h .hbtn.hbox:not(.voice) { padding: 0; width: 30px; } }
+@media (max-width: 360px) { header.lab .brand-txt { display: none; } }
+
+/* 사용 가이드 */
+.guide-row { grid-template-columns: 170px 1fr; }
+.guide-list { margin: 0; padding: 14px 18px 14px 34px; display: grid; gap: 8px; font-size: 16px; line-height: 1.65; color: var(--ink2); }
+.guide-list li::marker { color: var(--pen-blue); font-weight: 700; }
+@media (max-width: 760px) { .guide-row { grid-template-columns: 1fr; } .guide-list { padding: 10px 8px 12px 26px; font-size: 15.5px; } }

@@ -85,25 +85,32 @@
     function nav(label, on, key) {
       return h('button', { type: 'button', class: 'navlink' + (active === key ? ' on' : ''), 'data-nav': key, onclick: on }, [label]);
     }
-    var voiceBtn = h('button', { type: 'button', class: 'hbtn wide', 'data-ic': '🎙️', 'data-voice-state': '', 'aria-label': 'AI 목소리', onclick: settings });
-    function upd() {
-      var st = SL.model.state;
-      voiceBtn.textContent = st === 'ready' ? '🎙️ AI 목소리' : st === 'loading' ? '🎙️ ' + (SL.model.pct || 0) + '%' : '🔇 목소리 준비';
-      voiceBtn.classList.toggle('off', st !== 'ready');
-      voiceBtn.setAttribute('data-ic', st === 'ready' ? '🎙️' : '🔇');
-    }
-    keepOff(voiceBtn, SL.onModel(upd)); upd();
-    var fsBtn = h('button', { type: 'button', class: 'hbtn', 'aria-label': '전체 화면', title: '전체 화면', onclick: function () {
+    var fsBtn = h('button', { type: 'button', class: 'hbtn', id: 'fsBtn', 'aria-label': '전체 화면', title: '전체 화면', onclick: function () {
       try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) { }
-    } }, ['⛶']);
+    } }, [SL.hicon(document.fullscreenElement ? 'compress' : 'expand')]);
     return h('header', { class: 'lab' }, [
-      h('h1', {}, [h('button', { type: 'button', class: 'brand', 'aria-label': '처음 화면', onclick: shelf }, [h('img', { src: 'img/pibo-logo.png', alt: '' }), h('span', { class: 'brand-txt', text: '그림책 공방' })])]),
+      h('h1', {}, [h('button', { type: 'button', class: 'brand', 'aria-label': '처음 화면', onclick: shelf }, [h('img', { src: 'img/pibo-logo.png', alt: '' }), h('span', { class: 'brand-txt', text: 'Story Lab' })])]),
       nav('만들기', worlds, 'make'), nav('책장', shelfPage, 'shelf'), nav('국어 놀이', learnHub, 'learn'),
-      h('span', { class: 'grow' }),
-      voiceBtn,
-      h('button', { type: 'button', class: 'hbtn', 'aria-label': '설정', title: '설정', onclick: settings }, ['⚙']),
+      h('span', { class: 'hsp' }),
+      voiceBadge(settings),
+      h('button', { type: 'button', class: 'hbtn hbox' + (active === 'guide' ? ' on' : ''), 'data-nav': 'guide', 'aria-label': '사용 가이드', title: '사용 가이드', onclick: guide }, [SL.hicon('guide'), h('span', { text: '가이드' })]),
+      h('button', { type: 'button', class: 'hbtn', 'aria-label': '설정', title: '설정', onclick: settings }, [SL.hicon('gear')]),
       document.documentElement.requestFullscreen ? fsBtn : null
     ]);
+  }
+  /* 상단바 목소리 상태 단추 (처음 화면·읽기 화면이 같이 쓴다). 화면에 있는 동안만 상태를 따라 바뀐다 */
+  function voiceBadge(onclick) {
+    var b = h('button', { type: 'button', class: 'hbtn hbox voice', 'data-voice-state': '', 'aria-label': 'AI 목소리', title: 'AI 목소리', onclick: onclick });
+    function upd() {
+      var st = SL.model.state;
+      b.textContent = '';
+      b.appendChild(SL.hicon(st === 'ready' ? 'mic' : 'micoff'));
+      b.appendChild(h('span', { text: st === 'ready' ? 'AI 목소리' : st === 'loading' ? (SL.model.pct || 0) + '%' : '목소리 준비' }));
+      b.classList.toggle('off', st !== 'ready');
+      b.classList.toggle('busy', st === 'loading');
+    }
+    keepOff(b, SL.onModel(upd)); upd();
+    return b;
   }
   /* 만들기 단계 표시줄 (킷 .steps): 1 이야기 상자 · 2 설계도 · 3 이야기 카드 · 4 제본 · 5 읽기 */
   var MAKE_STEPS = ['이야기 상자', '설계도', '이야기 카드', '제본', '읽기'];
@@ -401,6 +408,50 @@
   }
 
   /* ---------- 국어 놀이 ---------- */
+  /* 사용 가이드: 아이와 함께 보는 순서 + 선생님·부모님께 드리는 안내 */
+  function guide() {
+    function sec(no, title, lines) {
+      return h('div', { class: 'srow guide-row' }, [
+        h('div', { class: 'slab' }, [h('span', { class: 'no', text: no }), h('b', { text: title })]),
+        h('ol', { class: 'guide-list' }, lines.map(function (t) { return h('li', { text: t }); }))
+      ]);
+    }
+    screen('guide', [labHeader('guide'), h('div', { class: 'scroll' }, [h('div', { class: 'sheet-wrap' }, [h('div', { class: 'sheet' }, [
+      h('div', { class: 'sheet-top' }, [h('h2', { text: '사용 가이드' }), h('p', { text: '이야기를 짓고, 그림책으로 묶고, 소리 내어 읽는 순서예요.' })]),
+      h('div', { class: 'rows' }, [
+        sec('1', '이야기 짓기', [
+          '처음 화면이나 [만들기]에서 이야기 상자(모험·우주·바닷속…)를 골라요.',
+          '설계도에서 아기 · 꼬마 · 큰 책 중 하나를 고르거나, [내 맘대로]로 인물 · 장소 · 사건 수를 정해요.',
+          '주인공을 고르고 이름을 지어 줘요. 그다음 카드를 한 장씩 골라 이야기를 이어 가요. 고민되면 🎲 [골라 줘]를 눌러요.',
+          '[순서도 보기]를 켜면 처음 → 사건 → 해결 → 끝이 한눈에 보이고, 앞 칸을 눌러 다시 고를 수 있어요.',
+          '제목과 지은이를 쓰면 그림책이 완성돼요.'
+        ]),
+        sec('2', '읽기 · 꾸미기', [
+          '책장에서 책을 누르면 펼친 책으로 읽어요. 화살표나 옆으로 밀어서 넘겨요.',
+          '[읽어 주기]를 누르면 AI 목소리가 읽고, 읽는 문장을 노랗게 짚어요.',
+          '[꾸미기]에서 쪽마다 배경, 책 전체의 그림(이모지), 인물별 목소리를 바꿔요. 그림은 손가락으로 끌어 옮겨요.',
+          '[영상]을 누르면 책장을 넘기며 읽어 주는 MP4 영상을 이 기기 안에서 만들어 내려받아요.'
+        ]),
+        sec('3', '국어 놀이', [
+          '따라 읽기: 한 문장씩 듣고, 따라 읽을 시간을 줘요.',
+          '낱말장: 내 책에 나온 흉내 내는 말 · 이어 주는 말 · 마음 낱말을 모아 봐요.',
+          '이야기 지도: 처음 · 사건 · 해결 · 끝을 한 장에 정리해요.',
+          '이야기 돌아보기: 누가? 어디서? 무슨 일? 어떻게? 점수 없이 다시 해 볼 수 있어요.'
+        ]),
+        sec('4', 'AI 목소리', [
+          '처음 한 번 [AI 목소리 준비하기]를 누르면 목소리 파일(약 180MB)을 내려받아요. Wi-Fi에서 해 주세요.',
+          '그다음부터는 앱을 열 때 기기에 저장된 목소리를 바로 불러오고, 인터넷이 없어도 읽어요.',
+          '목소리는 이 기기 안에서 만들어요. 아이의 이야기나 이름은 밖으로 보내지 않아요.'
+        ]),
+        sec('5', '선생님 · 부모님께', [
+          '만든 책은 이 브라우저 안에만 저장돼요. 브라우저 기록을 지우면 책도 지워져요.',
+          '그림은 이모지라서 기기마다 조금씩 다르게 보여요.',
+          'AI 목소리는 컴퓨터가 만든 목소리예요. 아이에게 그렇게 알려 주세요.',
+          '이야기 짓기는 순서(처음 · 사건 · 해결 · 끝), 인물의 마음, 이어 주는 말을 익히는 데 초점을 두었어요.'
+        ])
+      ])
+    ])])])]);
+  }
   function learnHub() {
     var cells = h('div', { class: 'cells' }, [
       ['echo', '따라 읽기', '한 문장씩 듣고, 따라 읽을 시간을 줘요', function () { needBook(function (b) { read(b, 0, true, { echo: true }); }); }, 'learn-echo'],
@@ -580,7 +631,7 @@
     var stage = h('div', { class: 'stage' });
     var pno = h('div', { class: 'pno', 'data-pno': '' });
     var playBtn = btn('🔊 읽어 주기', 'primary', function () { if (playing) stopPlay(); else startPlay(); }, { 'data-act': 'play', 'data-ic': '🔊' });
-    var badge = h('button', { type: 'button', class: 'hbtn wide', 'data-ai': '', 'data-ic': '🎙️', onclick: function () { stopPlay(); settings(); } });
+    var badge = voiceBadge(function () { stopPlay(); settings(); });
     var echoBtn = btn('🔁 따라 읽기', echo ? 'on' : '', function () { echo = !echo; echoBtn.classList.toggle('on', echo); echoBtn.setAttribute('aria-pressed', echo ? 'true' : 'false'); if (playing) { stopPlay(); startPlay(); } }, { 'data-act': 'echo', 'data-ic': '🔁', 'aria-pressed': echo ? 'true' : 'false' });
     var echoTip = h('div', { class: 'echo-tip', 'aria-live': 'polite' });
     var prevB = btn('◀', 'icon white', function () { go(idx - 1); }, { 'aria-label': '앞 쪽', 'data-act': 'prev' });
@@ -730,26 +781,18 @@
       else if (e.key === 'Escape') { e.preventDefault(); shelf(); }
     }
     function onVis() { if (document.hidden) stopPlay(); }
-    function updBadge() {
-      var st = SL.model.state;
-      badge.textContent = st === 'ready' ? '🎙️ AI 목소리' : st === 'loading' ? '🎙️ ' + (SL.model.pct || 0) + '%' : '🔇 목소리 준비';
-      badge.setAttribute('data-ic', st === 'ready' ? '🎙️' : '🔇');
-      badge.classList.toggle('off', st !== 'ready');
-    }
-    var offModel = SL.onModel(updBadge);
 
     screen('read', [
-      h('header', { class: 'lab' }, [btn('✕', 'icon ghost', shelf, { 'aria-label': '책장으로', 'data-act': 'close' }), h('div', { class: 'grow htitle read-t', text: book.title }), badge,
-        h('button', { type: 'button', class: 'hbtn', 'aria-label': '꾸미기 (배경·그림·목소리)', title: '꾸미기', 'data-act': 'decorate', onclick: function () { stopPlay(); decorEditor(book, pages[idx], function () { pages = SL.buildBook(book); render(0); }); } }, ['🎨']),
-        h('button', { type: 'button', class: 'hbtn', 'aria-label': '영상(MP4)으로 내려받기', title: '영상으로 내려받기', 'data-act': 'video', onclick: function () { stopPlay(); videoExport(book); } }, ['🎬'])]),
+      h('header', { class: 'lab read-h' }, [h('button', { type: 'button', class: 'hbtn', 'aria-label': '책장으로', title: '닫기', 'data-act': 'close', onclick: shelf }, [SL.hicon('close')]), h('div', { class: 'grow htitle read-t', text: book.title }), badge,
+        h('button', { type: 'button', class: 'hbtn hbox', 'aria-label': '꾸미기 (배경·그림·목소리)', title: '꾸미기', 'data-act': 'decorate', onclick: function () { stopPlay(); decorEditor(book, pages[idx], function () { pages = SL.buildBook(book); render(0); }); } }, [SL.hicon('paint'), h('span', { text: '꾸미기' })]),
+        h('button', { type: 'button', class: 'hbtn hbox', 'aria-label': '영상(MP4)으로 내려받기', title: '영상으로 내려받기', 'data-act': 'video', onclick: function () { stopPlay(); videoExport(book); } }, [SL.hicon('video'), h('span', { text: '영상' })])]),
       stage,
       h('div', { class: 'bar bottom' }, [echoBtn, h('span', { class: 'sp' }), prevB, pno, nextB, h('span', { class: 'sp' }), playBtn])
     ]);
     document.addEventListener('keydown', onKey);
     document.addEventListener('visibilitychange', onVis);
-    leaveRead = function () { stopPlay(); document.removeEventListener('keydown', onKey); document.removeEventListener('visibilitychange', onVis); offModel(); reading = false; };
+    leaveRead = function () { stopPlay(); document.removeEventListener('keydown', onKey); document.removeEventListener('visibilitychange', onVis); reading = false; };
     reading = true;
-    updBadge();
     render(0);
     if (auto) startPlay();
   }

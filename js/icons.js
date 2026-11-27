@@ -17,6 +17,23 @@
     wrap.innerHTML = '<svg class="ill ' + (cls || '') + '" viewBox="0 0 80 58" aria-hidden="true">' + (I[name] || '') + '</svg>';
     return wrap.firstChild;
   };
+  /* 상단바 단추용 선 아이콘 (24 칸, 글자색을 따름) */
+  var H = {
+    mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>',
+    micoff: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7M4 4l16 16"/>',
+    guide: '<path d="M12 6.5C9.5 4.8 6 4.6 3 5.5v13c3-.9 6.5-.7 9 1 2.5-1.7 6-1.9 9-1v-13c-3-.9-6.5-.7-9 1zM12 6.5v13"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9"/><circle cx="12" cy="12" r="6.6"/>',
+    expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+    compress: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    paint: '<path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-.9 2-1.9 0-1.2-1-1.6-1-2.6 0-.9.8-1.5 1.8-1.5H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle class="f" cx="7.5" cy="11" r="1.2"/><circle class="f" cx="10.5" cy="7.3" r="1.2"/><circle class="f" cx="15" cy="7.6" r="1.2"/>',
+    video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3z"/>'
+  };
+  SL.hicon = function (name) {
+    var wrap = document.createElement('span');
+    wrap.innerHTML = '<svg class="hic" viewBox="0 0 24 24" aria-hidden="true">' + (H[name] || '') + '</svg>';
+    return wrap.firstChild;
+  };
   /* 빨간 펜 동그라미 (첫 화면 "여기서 시작!") */
   SL.ring = function () {
     var wrap = document.createElement('span');

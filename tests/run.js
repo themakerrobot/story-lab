@@ -260,6 +260,9 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
     assert(await page.$('[data-screen=worlds]'), '책이 없을 때 이야기 지도가 새 책으로 가지 않음');
     await page.click('[data-nav=shelf]'); assert(await page.$('[data-screen=shelfpage]'), '책장 탭');
     await page.click('[data-nav=learn]'); assert(await page.$('[data-screen=learn]'), '국어 놀이 탭');
+    await page.click('[data-nav=guide]'); assert((await page.$$('[data-screen=guide] .guide-row')).length === 5, '사용 가이드 칸 수');
+    assert(await page.$('[data-nav=guide].on'), '가이드 단추가 켜짐 표시가 안 됨');
+    assert((await page.title()) === 'Story Lab — 그림책 공방', '페이지 제목 ' + (await page.title()));
     await page.click('.brand'); assert(await page.$('[data-screen=shelf]'), '로고를 누르면 처음 화면');
     await page.click('[data-home-world="adv"]');
     assert(await page.$('[data-screen=plan]'), '첫 화면 이야기 상자 칸이 설계도로 가지 않음');
@@ -595,6 +598,8 @@ async function makeBook(page, { world = 'adv', preset = 'baby', name = '콩', au
           if (!r.width) return;
           if (r.left < -1 || r.right > vw + 1) out.push('버튼이 옆으로 나감 "' + b.textContent.slice(0, 12) + '" ' + Math.round(r.left) + '~' + Math.round(r.right));
           if (b.closest('.bar') && (r.top < -1 || r.bottom > vh + 1)) out.push('윗줄/아랫줄 버튼이 화면 밖 "' + b.textContent.slice(0, 12) + '" ' + Math.round(r.top) + '~' + Math.round(r.bottom) + ' / ' + vh);
+          /* 상단바는 ai-lab 과 같은 치수(단추 30, 메뉴 36~40)를 따른다. 대신 화면 밖으로 나가거나 겹치면 안 된다 */
+          if (b.closest('header.lab')) { if (r.height < 23 || r.width < 23) out.push('상단바 단추가 너무 작음 "' + b.textContent.slice(0, 12) + '" ' + Math.round(r.width) + '×' + Math.round(r.height)); return; }
           if (r.height < 47.5 || r.width < 47.5) out.push('터치 대상이 48px 미만 "' + b.textContent.slice(0, 12) + '" ' + Math.round(r.width) + '×' + Math.round(r.height));
         });
         return out;
